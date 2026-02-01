@@ -7,6 +7,7 @@ import ActivePolls from './pages/ActivePolls';
 import VotingHistory from './pages/VotingHistory';
 import SettingsRegions from './pages/SettingsRegions';
 import SettingsVerificationProviders from './pages/SettingsVerificationProviders';
+import SettingsBlockchain from './pages/SettingsBlockchain';
 import Dashboard from './pages/Dashboard';
 import SecurityLogs from './pages/SecurityLogs';
 import PollDetails from './pages/PollDetails';
@@ -38,6 +39,7 @@ function App() {
             <Route index element={<Navigate to="/settings/regions" replace />} />
             <Route path="regions" element={<SettingsRegions />} />
             <Route path="verification-providers" element={<SettingsVerificationProviders />} />
+            <Route path="blockchain" element={<SettingsBlockchain />} />
           </Route>
         </Route>
       </Routes>

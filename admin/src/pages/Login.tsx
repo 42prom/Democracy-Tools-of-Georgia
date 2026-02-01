@@ -18,6 +18,7 @@ export default function Login({ onLogin }: LoginProps) {
     // Phase 0: Mock authentication
     if (email === 'admin@dtfg.ge' && password === 'phase0password') {
       localStorage.setItem('adminToken', 'phase0password')
+      localStorage.setItem('admin_token', 'phase0password')
       onLogin()
       navigate('/')
     } else {

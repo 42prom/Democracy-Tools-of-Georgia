@@ -28,7 +28,7 @@ const apiClient = axios.create({
 
 // Admin authentication (mock for Phase 0)
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
+  const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -242,3 +242,26 @@ export const adminMessagesApi = {
 };
 
 export default apiClient;
+
+
+// Admin Settings endpoints
+export type AdminSettings = {
+  rewards_enabled_global: boolean;
+  nft_payouts_enabled_global: boolean;
+  chain_id: number;
+  rpc_url: string;
+  nft_contract_address: string;
+  reward_token_id: number; // fixed to 1
+  required_confirmations: number;
+};
+
+export const settingsApi = {
+  get: async (): Promise<AdminSettings> => {
+    const response = await apiClient.get('/admin/settings');
+    return response.data;
+  },
+  update: async (data: Partial<AdminSettings>): Promise<AdminSettings> => {
+    const response = await apiClient.patch('/admin/settings', data);
+    return response.data;
+  },
+};
