@@ -1,0 +1,8 @@
+id,name,type,parent_id,active
+reg_geo,Georgia,country,,true
+reg_tbilisi,Tbilisi,region,reg_geo,true
+reg_batumi,Batumi,city,reg_adjara,true
+reg_kutaisi,Kutaisi,city,reg_imereti,true
+reg_adjara,Adjara,region,reg_geo,true
+reg_imereti,Imereti,region,reg_geo,true
+reg_rustavi,Rustavi,city,reg_kvemo_kartli,true

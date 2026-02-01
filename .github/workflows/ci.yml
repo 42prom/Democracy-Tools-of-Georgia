@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: dtfg_test
+          POSTGRES_USER: dtfg_user
+          POSTGRES_PASSWORD: dtfg_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./backend
+        run: npm run lint
+
+      - name: Run TypeScript check
+        working-directory: ./backend
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://dtfg_user:dtfg_test_password@localhost:5432/dtfg_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_secret_key_for_ci
+          NODE_ENV: test
+        run: npm test
+
+      - name: Build
+        working-directory: ./backend
+        run: npm run build
+
+  admin-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./admin
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./admin
+        run: npm run lint
+
+      - name: Run TypeScript check
+        working-directory: ./admin
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: ./admin
+        run: npm run build

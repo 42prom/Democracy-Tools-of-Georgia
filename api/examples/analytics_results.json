@@ -1,0 +1,9 @@
+{
+  "pollId": "...",
+  "results": [
+    { "optionId": "A", "count": 1420 },
+    { "optionId": "B", "count": 890 }
+  ],
+  "totalVotes": 2310,
+  "isSuppressed": false
+}

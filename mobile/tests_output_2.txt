@@ -1,0 +1,90 @@
+00:00 +0: loading C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart
+00:00 +0: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests API Service has NO admin endpoints
+00:00 +1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests No admin-related files exist in lib/
+00:00 +2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests No deep link configuration exists
+00:00 +3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests API calls are only to citizen endpoints
+00:00 +4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests Only citizen-facing dependencies are included
+00:00 +5: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Admin Compliance Tests No hidden admin toggle or debug mode exists
+00:00 +6: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Citizen Features Only App has only citizen screens
+00:00 +7: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Citizen Features Only Bottom navigation has only citizen tabs
+00:00 +7 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/admin_compliance_test.dart: Citizen Features Only Bottom navigation has only citizen tabs [E]
+  Expected: true
+    Actual: <false>
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test\admin_compliance_test.dart 177:7               main.<fn>.<fn>
+  
+00:00 +7 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +8 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +9 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +10 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +11 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +12 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +13 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +14 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +15 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +16 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +17 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +18 -1: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +18 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +18 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/voting_flow_test.dart: Privacy Compliance Tests Storage service does NOT store biometric data [E]
+  MissingPluginException(No implementation found for method getAll on channel plugins.flutter.io/shared_preferences)
+  dart:async                                                           _Completer.completeError
+  package:shared_preferences/src/shared_preferences_legacy.dart 90:19  SharedPreferences.getInstance
+  ===== asynchronous gap ===========================
+  dart:async                                                           _CustomZone.registerBinaryCallback
+  package:shared_preferences/src/shared_preferences_legacy.dart 85:13  SharedPreferences.getInstance
+  package:mobile/services/storage_service.dart 18:43                   StorageService.isEnrolled
+  test\voting_flow_test.dart 198:47                                    main.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                           _CustomZone.registerUnaryCallback
+  test\voting_flow_test.dart 197:22                                    main.<fn>.<fn>
+  
+00:00 +18 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +19 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +20 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +21 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +22 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +23 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +24 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +25 -2: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +25 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +25 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/voting_flow_test.dart: Security Tests Credential secret is unique per device [E]
+  MissingPluginException(No implementation found for method getAll on channel plugins.flutter.io/shared_preferences)
+  dart:async                                                           _Completer.completeError
+  package:shared_preferences/src/shared_preferences_legacy.dart 90:19  SharedPreferences.getInstance
+  ===== asynchronous gap ===========================
+  dart:async                                                           _CustomZone.registerBinaryCallback
+  package:shared_preferences/src/shared_preferences_legacy.dart 85:13  SharedPreferences.getInstance
+  package:mobile/services/storage_service.dart 102:43                  StorageService.clearAll
+  test\voting_flow_test.dart 302:22                                    main.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                           _CustomZone.registerUnaryCallback
+  test\voting_flow_test.dart 300:23                                    main.<fn>.<fn>
+  
+00:00 +26 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +27 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +28 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +29 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +30 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 1 (Intro) has NO footer
+00:00 +31 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/wallet_mvp_test.dart: Wallet Service Tests (No PIN) Transactions can be added and stored
+00:00 +32 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 2 (NFC Scan) has NO footer
+00:00 +33 -3: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 2 (NFC Scan) has NO footer
+00:01 +33 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 2 (NFC Scan) has NO footer
+00:01 +33 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/wallet_mvp_test.dart: Wallet Service Tests (No PIN) clearAll resets wallet storage and balance [E]
+  Expected: not '0x19c154ad01f33333333333333333333333333333'
+    Actual: '0x19c154ad01f33333333333333333333333333333'
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test\wallet_mvp_test.dart 111:7                     main.<fn>.<fn>
+  
+00:01 +34 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Step 2 (Liveness) has NO footer
+00:01 +35 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Dashboard (after success) HAS footer
+00:01 +36 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Footer has correct tabs: Wallet | Voting | Settings
+00:01 +37 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Footer defaults to Voting tab (center)
+00:01 +38 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Footer tab switching works
+00:01 +39 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Rule Tests Dashboard shows Voting content by default
+00:01 +40 -4: C:/Users/nakem/OneDrive/Desktop/antygravity/mobile/test/footer_rule_test.dart: Footer Visual Tests Footer has correct styling
+00:01 +41 -4: Some tests failed.

@@ -1,0 +1,192 @@
+openapi: 3.0.0
+info:
+  title: DTFG API
+  version: 1.0.0
+  description: API for Democratic Tools for Georgia (Voting System)
+servers:
+  - url: /api/v1
+paths:
+  /auth/challenge:
+    post:
+      summary: Get authentication nonce
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+      responses:
+        "200":
+          description: Nonce issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeResponse"
+
+  /auth/enroll:
+    post:
+      summary: Submit enrollment proof
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentRequest"
+      responses:
+        "200":
+          description: Credential issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  credential:
+                    type: string
+
+  /polls:
+    get:
+      summary: List eligible polls
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of polls
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poll"
+
+  /polls/{id}/vote:
+    post:
+      summary: Submit vote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteSubmission"
+      responses:
+        "200":
+          description: Vote accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  txHash:
+                    type: string
+
+  /admin/polls/estimate:
+    post:
+      summary: Estimate audience size
+      responses:
+        "200":
+          description: Estimate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudienceEstimate"
+
+  /stats/polls/{id}:
+    get:
+      summary: Get poll results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PollResults"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    ChallengeResponse:
+      type: object
+      properties:
+        nonce:
+          type: string
+        ttl:
+          type: integer
+    EnrollmentRequest:
+      type: object
+      properties:
+        proof:
+          type: string
+        deviceKey:
+          type: string
+    Poll:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+    VoteSubmission:
+      type: object
+      required:
+        - nullifier
+        - nonce
+        - optionId
+        - signature
+      properties:
+        pollId:
+          type: string
+        optionId:
+          type: string
+        nullifier:
+          type: string
+        nonce:
+          type: string
+        signature:
+          type: string
+    AudienceEstimate:
+      type: object
+      properties:
+        count:
+          type: integer
+        isPrivacySafe:
+          type: boolean
+    PollResults:
+      type: object
+      properties:
+        totalVotes:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              optionId:
+                type: string
+              count:
+                type: integer
