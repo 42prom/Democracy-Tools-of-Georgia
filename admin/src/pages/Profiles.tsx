@@ -90,8 +90,19 @@ export default function Profiles() {
   const handleExportAggregated = async () => {
     setExporting(true);
     try {
-      // Use the CSV export endpoint
-      window.open('/api/v1/admin/export/users.csv', '_blank');
+      // Use the CSV export endpoint with auth header
+      const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken');
+      const response = await fetch('/api/v1/admin/export/users.csv', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `users-export-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (error) {
       console.error('Failed to export:', error);
       alert('Failed to export data.');
@@ -107,8 +118,19 @@ export default function Profiles() {
 
     setExporting(true);
     try {
-      // Use the CSV export endpoint (same as aggregated for Phase 0)
-      window.open('/api/v1/admin/export/users.csv', '_blank');
+      // Use the CSV export endpoint with auth header
+      const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken');
+      const response = await fetch('/api/v1/admin/export/users.csv', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `users-export-restricted-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (error) {
       console.error('Failed to export:', error);
       alert('Failed to export profile list.');
@@ -166,17 +188,9 @@ export default function Profiles() {
 
     setUpdatingRegion(true);
     try {
-      // Call API to update region
-      const response = await fetch(`/api/v1/admin/profiles/${selectedProfile.id}/region`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ regionCode: selectedRegion }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update region');
-      }
-
+      // Call API to update region using profilesApi (which has auth interceptor)
+      await profilesApi.updateRegion(selectedProfile.id, selectedRegion);
+      
       // Update local state
       setSelectedProfile({ ...selectedProfile, regionBucket: selectedRegion });
       setEditingRegion(false);

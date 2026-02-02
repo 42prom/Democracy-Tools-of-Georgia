@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/client';
+import { getJwtSecret } from '../config/jwt';
+import { issueCredentialForSubject } from './credentials';
 
 const PN_HASH_SECRET = process.env.PN_HASH_SECRET || 'CHANGE_ME_IN_PRODUCTION';
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 const SESSION_EXPIRY_MINUTES = 2;
@@ -33,6 +34,7 @@ interface LoginOrEnrollResponse {
     regionCodes?: string[];
   };
   sessionAttestation: string;
+  credentialToken: string;
 }
 
 /**
@@ -121,7 +123,7 @@ export async function recordFailedAttempt(pnHash: string, ipAddress: string): Pr
     [pnHash, ipAddress, MAX_ATTEMPTS]
   );
 
-  const { attempt_count, locked_until } = result.rows[0];
+  const { attempt_count, locked_until: _locked_until } = result.rows[0];
 
   // Log lockout event if threshold reached
   if (attempt_count >= MAX_ATTEMPTS) {
@@ -146,16 +148,36 @@ export async function clearRateLimit(pnHash: string, ipAddress: string): Promise
 
 /**
  * Generate session attestation JWT
+ * Phase 0/1: Should be compatible with VotingCredential for access control
  */
 export function generateSessionAttestation(userId: string, credential: any): string {
   const payload = {
-    userId,
-    credential,
+    iss: 'dtfg-identity-service',
+    sub: userId, // Use userId as subject for session tokens
+    data: {
+      age_bucket: credential.birthYear ? calculateAgeBucket(credential.birthYear) : '25-34', // Mock/default
+      gender: credential.gender || 'O',
+      region_codes: credential.regionCodes || [],
+      citizenship: 'GEO',
+    },
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + SESSION_EXPIRY_MINUTES * 60,
   };
 
-  return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
+  return jwt.sign(payload, getJwtSecret(), { algorithm: 'HS256' });
+}
+
+/**
+ * Helper to calculate age bucket from birth year
+ */
+function calculateAgeBucket(birthYear: number): any {
+  const age = new Date().getFullYear() - birthYear;
+  if (age < 25) return '18-24';
+  if (age < 35) return '25-34';
+  if (age < 45) return '35-44';
+  if (age < 55) return '45-54';
+  if (age < 65) return '55-64';
+  return '65+';
 }
 
 /**
@@ -163,7 +185,7 @@ export function generateSessionAttestation(userId: string, credential: any): str
  */
 export function verifySessionAttestation(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (error) {
     throw new Error('Invalid or expired session attestation');
   }
@@ -268,10 +290,24 @@ export async function loginOrEnroll(
 
   const sessionAttestation = generateSessionAttestation(userId, credential);
 
+  // Long-lived credential token used by API Authorization (Bearer)
+  // Keep sessionAttestation short-lived for session verification flows.
+  const credentialToken = issueCredentialForSubject(
+    userId,
+    {
+      age_bucket: birthYear ? calculateAgeBucket(birthYear) : '25-34',
+      gender: (gender === 'M' ? 'M' : gender === 'F' ? 'F' : 'O'),
+      region_codes: regionCodes || [],
+      citizenship: 'GEO',
+    } as any,
+    7 * 24 * 60 * 60
+  );
+
   return {
     isNew,
     userId,
     credential,
     sessionAttestation,
+    credentialToken,
   };
 }

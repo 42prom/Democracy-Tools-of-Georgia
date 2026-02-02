@@ -24,9 +24,9 @@ class RealAuthApi implements IAuthApi {
         'pnDigits': pnDigits,
         'liveness': liveness,
         'faceMatch': faceMatch,
-        'gender': ?gender,
-        'birthYear': ?birthYear,
-        'regionCodes': ?regionCodes,
+        'gender': gender,
+        'birthYear': birthYear,
+        'regionCodes': regionCodes,
       }),
     );
 
@@ -34,11 +34,22 @@ class RealAuthApi implements IAuthApi {
       final data = json.decode(response.body);
       return LoginOrEnrollResponse.fromJson(data);
     } else {
-      final error = json.decode(response.body);
-      throw AuthException(
-        message: error['error'] ?? 'Authentication failed',
-        reasonCode: error['reasonCode'],
-      );
+      Map<String, dynamic> error;
+      try {
+        error = json.decode(response.body) as Map<String, dynamic>;
+      } catch (_) {
+        throw AuthException(message: 'Authentication failed');
+      }
+
+      final dynamic errObj = error['error'];
+      final String message = (errObj is Map && errObj['message'] != null)
+          ? errObj['message'].toString()
+          : (error['message'] ?? error['error'] ?? 'Authentication failed').toString();
+      final String? code = (errObj is Map && errObj['code'] != null)
+          ? errObj['code'].toString()
+          : (error['reasonCode']?.toString());
+
+      throw AuthException(message: message, reasonCode: code);
     }
   }
 

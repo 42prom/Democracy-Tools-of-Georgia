@@ -50,7 +50,7 @@ export default function PollDetails() {
     if (!id || !confirm('Are you sure you want to close this poll?')) return;
 
     try {
-      await adminPollsApi.update(id, { status: 'ended' });
+      await adminPollsApi.update(id, { status: 'closed' });
       alert('Poll closed successfully');
       navigate('/active');
     } catch (error) {

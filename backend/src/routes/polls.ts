@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { requireCredential } from '../middleware/auth';
 import { getEligiblePolls, getSurveyQuestions } from '../services/polls';
 import { submitVote } from '../services/voting';
-import NonceService from '../services/nonce';
 import { VoteSubmission } from '../types/polls';
 import { createError } from '../middleware/errorHandler';
 import { pool } from '../db/client';
@@ -113,7 +112,7 @@ router.post(
       }
 
       // Get survey questions for validation
-      const questions = await getSurveyQuestions(pollId);
+      const questions = await getSurveyQuestions(String(pollId));
       const questionMap = new Map(questions.map(q => [q.id, q]));
 
       // Build demographics snapshot

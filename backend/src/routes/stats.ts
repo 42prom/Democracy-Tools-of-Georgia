@@ -21,7 +21,7 @@ const getPollResultsHandler = async (req: Request, res: Response, next: NextFunc
       throw createError('Invalid groupBy parameter', 400);
     }
 
-    const results = await getPollResults(id, groupBy);
+    const results = await getPollResults(String(id), groupBy);
 
     res.json(results);
   } catch (error) {

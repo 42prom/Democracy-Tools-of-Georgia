@@ -8,7 +8,7 @@ const router = Router();
  * GET /health
  * Health check endpoint
  */
-router.get('/health', async (req: Request, res: Response) => {
+router.get('/health', async (_req: Request, res: Response) => {
   try {
     const dbHealthy = await checkHealth();
     const redisHealthy = await checkRedisHealth();

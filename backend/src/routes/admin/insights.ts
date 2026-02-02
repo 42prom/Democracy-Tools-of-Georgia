@@ -13,9 +13,8 @@ router.use(requireAdmin);
  */
 router.get(
   '/distributions',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const { dimensions, minDate, maxDate } = req.query;
       const MIN_K_ANONYMITY = parseInt(process.env.MIN_K_ANONYMITY || '30', 10);
 
       // Get total user count

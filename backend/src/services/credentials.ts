@@ -2,9 +2,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { VotingCredential, DemographicData } from '../types/credentials';
 import { query } from '../db/client';
+import { getJwtSecret } from '../config/jwt';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
-const JWT_EXPIRY = '7d'; // 7 days
 
 /**
  * Generate device key thumbprint (SHA-256 hash)
@@ -93,7 +92,27 @@ export function issueCredential(
     exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
   };
 
-  return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
+  return jwt.sign(payload, getJwtSecret(), { algorithm: 'HS256' });
+}
+
+
+/**
+ * Issue a JWT voting credential for an arbitrary subject (e.g., userId or pn_hash)
+ * Useful for enrollment flows where device key is not the identity root.
+ */
+export function issueCredentialForSubject(
+  subject: string,
+  demographics: DemographicData,
+  ttlSeconds: number = 7 * 24 * 60 * 60
+): string {
+  const payload: VotingCredential = {
+    iss: 'dtfg-identity-service',
+    sub: subject,
+    data: demographics,
+    exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+  };
+
+  return jwt.sign(payload, getJwtSecret(), { algorithm: 'HS256' });
 }
 
 /**
@@ -101,12 +120,13 @@ export function issueCredential(
  */
 export function verifyCredential(token: string): VotingCredential {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJwtSecret(), {
       algorithms: ['HS256'],
     }) as VotingCredential;
 
     return decoded;
   } catch (error) {
+    console.error('JWT Verification Error:', error);
     throw new Error('Invalid or expired credential');
   }
 }

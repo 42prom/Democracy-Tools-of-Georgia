@@ -3,12 +3,25 @@ import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
 import '../../models/poll.dart';
 import '../interfaces/i_api_service.dart';
+import '../wallet_service.dart';
+import '../storage_service.dart';
 
 /// Real implementation of [IApiService] that calls the backend.
 class RealApiService implements IApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
 
   String? _credential;
+  String? _lastVoteNonce;
+  final StorageService _storage = StorageService();
+
+  Future<void> _ensureAuthenticated() async {
+    if (_credential == null) {
+      _credential = await _storage.getCredential();
+    }
+    if (_credential == null) {
+      throw Exception('Not authenticated');
+    }
+  }
 
   @override
   void setCredential(String credential) {
@@ -17,9 +30,7 @@ class RealApiService implements IApiService {
 
   @override
   Future<List<Poll>> getPolls() async {
-    if (_credential == null) {
-      throw Exception('Not authenticated');
-    }
+    await _ensureAuthenticated();
 
     final response = await http.get(
       Uri.parse('$baseUrl/polls'),
@@ -27,8 +38,9 @@ class RealApiService implements IApiService {
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((poll) => Poll.fromJson(poll)).toList();
+      final Map<String, dynamic> data = json.decode(response.body);
+      final List<dynamic> pollsData = data['polls'] ?? [];
+      return pollsData.map((poll) => Poll.fromJson(poll)).toList();
     } else {
       throw Exception('Failed to load polls');
     }
@@ -36,16 +48,18 @@ class RealApiService implements IApiService {
 
   @override
   Future<Map<String, dynamic>> requestChallenge() async {
-    if (_credential == null) {
-      throw Exception('Not authenticated');
-    }
+    await _ensureAuthenticated();
+
+    final walletService = WalletService();
+    final deviceId = await walletService.getWalletAddress();
 
     final response = await http.post(
-      Uri.parse('$baseUrl/attestations/challenge'),
+      Uri.parse('$baseUrl/auth/challenge'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_credential',
-      },
+            },
+      body: json.encode({'deviceId': deviceId, 'purpose': 'vote'}),
     );
 
     if (response.statusCode == 200) {
@@ -62,30 +76,19 @@ class RealApiService implements IApiService {
     required int timestampBucket,
     required String nonce,
   }) async {
-    if (_credential == null) {
-      throw Exception('Not authenticated');
-    }
+    // Backend no longer issues vote attestations in Phase 0.
+    // We keep this method for UI compatibility and bind the last vote nonce here.
+    _lastVoteNonce = nonce;
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/attestations/issue'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_credential',
-      },
-      body: json.encode({
-        'pollId': pollId,
-        'optionId': optionId,
-        'timestampBucket': timestampBucket,
-        'nonce': nonce,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to issue attestation');
-    }
+    return {
+      'attestation': 'mvp_attestation_${DateTime.now().millisecondsSinceEpoch}',
+      'pollId': pollId,
+      'optionId': optionId,
+      'timestampBucket': timestampBucket,
+      'nonce': nonce,
+    };
   }
+
 
   @override
   Future<Map<String, dynamic>> submitVote({
@@ -95,17 +98,30 @@ class RealApiService implements IApiService {
     required String attestation,
     required int timestampBucket,
   }) async {
+    await _ensureAuthenticated();
+
+    final nonce = _lastVoteNonce;
+    if (nonce == null) {
+      throw Exception('Missing vote nonce. Please retry.');
+    }
+
     final response = await http.post(
-      Uri.parse('$baseUrl/votes'),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('$baseUrl/polls/$pollId/vote'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_credential',
+      },
       body: json.encode({
         'pollId': pollId,
         'optionId': optionId,
         'nullifier': nullifier,
-        'attestation': attestation,
-        'timestampBucket': timestampBucket,
+        'nonce': nonce,
+        'signature': attestation, // MVP placeholder (not validated server-side yet)
       }),
     );
+
+    // Clear once used
+    _lastVoteNonce = null;
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -113,6 +129,7 @@ class RealApiService implements IApiService {
       throw Exception('Failed to submit vote: ${response.body}');
     }
   }
+
 
   @override
   Future<Map<String, dynamic>> submitSurvey({
@@ -122,14 +139,16 @@ class RealApiService implements IApiService {
     required int timestampBucket,
     required List<Map<String, dynamic>> responses,
   }) async {
+    await _ensureAuthenticated();
+
     final response = await http.post(
       Uri.parse('$baseUrl/polls/$pollId/survey-submit'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_credential',
+      },
       body: json.encode({
-        'pollId': pollId,
         'nullifier': nullifier,
-        'attestation': attestation,
-        'timestampBucket': timestampBucket,
         'responses': responses,
       }),
     );
@@ -141,9 +160,24 @@ class RealApiService implements IApiService {
     }
   }
 
+
   @override
   Future<String> mockEnrollment() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return 'mock_credential_phase0_${DateTime.now().millisecondsSinceEpoch}';
+    // Phase 0: Use wallet address as device key for enrollment
+    final walletService = WalletService();
+    final address = await walletService.getWalletAddress();
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/enroll'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'proof': 'mock_nfc_proof', 'deviceKey': address}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['credential'];
+    } else {
+      throw Exception('Enrollment failed: ${response.body}');
+    }
   }
 }

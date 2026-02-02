@@ -1,4 +1,4 @@
-import { query, transaction, getClient } from '../db/client';
+import { query, transaction } from '../db/client';
 import { VoteSubmission } from '../types/polls';
 import { VotingCredential } from '../types/credentials';
 import NonceService from './nonce';

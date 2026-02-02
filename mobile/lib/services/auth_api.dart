@@ -16,18 +16,20 @@ class AuthApi {
     int? birthYear,
     List<String>? regionCodes,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/login-or-enroll'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
+    final payload = <String, dynamic>{
         'pnDigits': pnDigits,
         'liveness': liveness,
         'faceMatch': faceMatch,
-        'gender': ?gender,
-        'birthYear': ?birthYear,
-        'regionCodes': ?regionCodes,
-      }),
-    );
+      };
+      if (gender != null) payload['gender'] = gender;
+      if (birthYear != null) payload['birthYear'] = birthYear;
+      if (regionCodes != null) payload['regionCodes'] = regionCodes;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/login-or-enroll'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(payload),
+      );
 
     Map<String, dynamic> data;
     try {
@@ -107,12 +109,14 @@ class LoginOrEnrollResponse {
   final bool success;
   final String userId;
   final String sessionAttestation;
+  final String? credentialToken;
   final bool isNewUser;
 
   LoginOrEnrollResponse({
     required this.success,
     required this.userId,
     required this.sessionAttestation,
+    this.credentialToken,
     required this.isNewUser,
   });
 
@@ -125,6 +129,7 @@ class LoginOrEnrollResponse {
         'sessionAttestation',
         altKey: 'session_attestation',
       ),
+      credentialToken: (json['credentialToken'] ?? json['credential_token'])?.toString(),
       isNewUser: _readBool(
         json,
         'isNewUser',

@@ -143,7 +143,7 @@ export async function getPollById(pollId: string): Promise<{ poll: Poll; options
  * Phase 0: Mock implementation returns random number
  * Phase 1: Will query actual user demographics
  */
-export async function estimateAudience(rules: AudienceRules): Promise<{ count: number; isPrivacySafe: boolean }> {
+export async function estimateAudience(_rules: AudienceRules): Promise<{ count: number; isPrivacySafe: boolean }> {
   // Phase 0: Return mock count
   const mockCount = Math.floor(Math.random() * (1000 - 50) + 50);
 

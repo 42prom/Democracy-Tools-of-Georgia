@@ -52,19 +52,12 @@ export async function getPollResults(
     );
 
     return {
-      pollId,
       totalVotes,
       results: resultsQuery.rows.map(row => ({
         optionId: row.option_id,
         optionText: row.option_text,
         count: parseInt(row.count, 10),
-        percentage: totalVotes > 0 ? (parseInt(row.count, 10) / totalVotes) * 100 : 0,
       })),
-      metadata: {
-        kThreshold: MIN_K_ANONYMITY,
-        suppressedCells: 0,
-        lastUpdated: new Date().toISOString(),
-      },
     };
   } else {
     // Grouped aggregation with k-anonymity enforcement
@@ -86,7 +79,7 @@ export async function getPollResults(
     );
 
     // Build results with suppression
-    const optionsMap: Record<string, { optionText: string; breakdowns: Record<string, number> }> = {};
+    const optionsMap: Record<string, { optionText: string; breakdowns: Record<string, number | string> }> = {};
 
     for (const row of resultsQuery.rows) {
       const optionId = row.option_id;
@@ -118,21 +111,12 @@ export async function getPollResults(
     }
 
     return {
-      pollId,
       totalVotes,
       results: Object.entries(optionsMap).map(([optionId, data]) => ({
         optionId,
         optionText: data.optionText,
-        count: Object.values(data.breakdowns).reduce((sum, val) => {
-          return sum + (typeof val === 'number' ? val : 0);
-        }, 0),
         breakdowns: data.breakdowns,
       })),
-      metadata: {
-        kThreshold: MIN_K_ANONYMITY,
-        suppressedCells,
-        lastUpdated: new Date().toISOString(),
-      },
     };
   }
 }

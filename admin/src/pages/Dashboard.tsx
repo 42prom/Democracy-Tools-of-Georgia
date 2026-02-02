@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle, Clock, Archive, TrendingUp } from 'lucide-react';
+import { FileText, CheckCircle, Archive, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { adminPollsApi } from '../api/client';
@@ -32,7 +32,7 @@ export default function Dashboard() {
       // Calculate stats
       const active = allPolls.filter(p => p.status === 'active').length;
       const draft = allPolls.filter(p => p.status === 'draft').length;
-      const ended = allPolls.filter(p => p.status === 'ended').length;
+      const ended = allPolls.filter(p => p.status === 'closed').length;
 
       setStats({
         active,

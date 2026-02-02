@@ -61,6 +61,7 @@ export interface CreatePollRequest {
   audience_rules: AudienceRules;
   start_at?: string;
   end_at?: string;
+  status?: PollStatus;
   rewards_enabled?: boolean;
   reward_amount?: number;
   reward_token?: string;

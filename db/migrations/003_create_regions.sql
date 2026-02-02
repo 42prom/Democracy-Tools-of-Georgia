@@ -3,6 +3,7 @@
 -- Purpose: Store administrative regions for poll audience targeting
 
 -- Create regions table
+DROP TABLE IF EXISTS regions CASCADE;
 CREATE TABLE IF NOT EXISTS regions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code VARCHAR(50) UNIQUE NOT NULL,

@@ -24,7 +24,6 @@ router.get(
         ageBucket,
         genderBucket,
         regionBucket,
-        status,
       } = req.query;
       const MIN_K_ANONYMITY = parseInt(process.env.MIN_K_ANONYMITY || '30', 10);
 
@@ -182,7 +181,7 @@ router.get(
  */
 router.get(
   '/:id',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       // Phase 0: Return not implemented
       res.status(501).json({
@@ -200,7 +199,7 @@ router.get(
  */
 router.post(
   '/export',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       // Phase 0: Return not implemented
       res.status(501).json({
@@ -248,7 +247,7 @@ router.get(
         participationRecords: [],
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );
@@ -283,12 +282,12 @@ router.patch(
 
       console.log(`✓ Updated region for user ${id} to ${regionCode}`);
 
-      res.json({
+      return res.json({
         success: true,
         regionCode: result.rows[0].credential_region_codes[0],
       });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 );

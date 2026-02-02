@@ -44,7 +44,7 @@ function formatArray(arr: any[]): string {
  */
 router.get(
   '/users.csv',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       console.log('📊 Exporting users to CSV...');
 
@@ -117,7 +117,7 @@ router.get(
  */
 router.get(
   '/security-events.csv',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       console.log('📊 Exporting security events to CSV...');
 

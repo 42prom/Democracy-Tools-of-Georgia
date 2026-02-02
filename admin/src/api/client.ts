@@ -190,6 +190,10 @@ export const profilesApi = {
     const response = await apiClient.get(`/admin/profiles/${profileId}/participation`);
     return response.data;
   },
+  updateRegion: async (profileId: string, regionCode: string): Promise<{ success: boolean; regionCode: string }> => {
+    const response = await apiClient.patch(`/admin/profiles/${profileId}/region`, { regionCode });
+    return response.data;
+  },
 };
 
 // Insights endpoints

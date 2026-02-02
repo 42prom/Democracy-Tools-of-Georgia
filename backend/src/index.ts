@@ -1,5 +1,8 @@
-import express, { Express } from 'express';
 import dotenv from 'dotenv';
+// Load environment variables immediately
+dotenv.config();
+
+import express, { Express } from 'express';
 import { connectRedis, closeRedis } from './db/redis';
 import { close as closeDb } from './db/client';
 import { securityHeaders, corsMiddleware } from './middleware/security';
@@ -14,10 +17,10 @@ import adminInsightsRouter from './routes/admin/insights';
 import adminProfilesRouter from './routes/admin/profiles';
 import adminSettingsRouter from './routes/admin/settings';
 import adminExportRouter from './routes/admin/export';
+import adminMessagesRouter from './routes/admin/messages';
 import statsRouter from './routes/stats';
-
-// Load environment variables
-dotenv.config();
+import settingsRouter from './routes/settings';
+import enrollmentRouter from './routes/enrollment';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +37,8 @@ app.use('/', healthRouter);
 
 // API v1 routes
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/settings', settingsRouter);
+app.use('/api/v1/enrollment', enrollmentRouter);
 app.use('/api/v1/polls', pollsRouter);
 app.use('/api/v1/admin/polls', adminPollsRouter);
 app.use('/api/v1/admin/regions', adminRegionsRouter);
@@ -41,6 +46,7 @@ app.use('/api/v1/admin/insights', adminInsightsRouter);
 app.use('/api/v1/admin/profiles', adminProfilesRouter);
 app.use('/api/v1/admin/settings', adminSettingsRouter);
 app.use('/api/v1/admin/export', adminExportRouter);
+app.use('/api/v1/admin/messages', adminMessagesRouter);
 app.use('/api/v1/stats', statsRouter);
 app.use('/api/v1/analytics', statsRouter); // Analytics endpoint (alias for stats)
 

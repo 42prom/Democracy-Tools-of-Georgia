@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requireAdmin } from '../../middleware/auth';
 import { createPoll, estimateAudience, publishPoll, getSurveyQuestions } from '../../services/polls';
-import { CreatePollRequest, AudienceRules } from '../../types/polls';
+import { AudienceRules } from '../../types/polls';
 import { createError } from '../../middleware/errorHandler';
 import { pool } from '../../db/client';
 
@@ -90,7 +90,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     // For survey type, also fetch survey questions with sub-options
     let surveyQuestions;
     if (poll.type === 'survey') {
-      surveyQuestions = await getSurveyQuestions(id);
+      surveyQuestions = await getSurveyQuestions(String(id));
     }
 
     const response: any = {
@@ -248,7 +248,7 @@ router.patch(
     try {
       const { id } = req.params;
 
-      const poll = await publishPoll(id);
+      const poll = await publishPoll(String(id));
 
       res.json(poll);
     } catch (error) {
@@ -287,7 +287,7 @@ router.get(
       const totalSubmissions = parseInt(submissionCountResult.rows[0].count, 10);
 
       // Get survey questions
-      const questions = await getSurveyQuestions(id);
+      const questions = await getSurveyQuestions(String(id));
       const questionResults: any[] = [];
 
       for (const question of questions) {

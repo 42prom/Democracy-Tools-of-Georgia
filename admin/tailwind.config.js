@@ -1,9 +1,19 @@
+import colors from 'tailwindcss/colors';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
+        // Full default palette (includes slate, zinc, neutral, etc.)
+        ...colors,
+
+        // Provide a "gray" palette so legacy gray-* classes work again
+        // (Tailwind v4 palettes lean on slate/zinc/neutral; we alias gray -> slate)
+        gray: colors.slate,
+
+        // Your custom primary palette
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',

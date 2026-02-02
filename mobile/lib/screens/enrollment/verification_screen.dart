@@ -137,10 +137,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
         // regionCodes: ['reg_tbilisi'],
       );
 
-      // Store credentials securely
-      await _storage.saveCredential(response.sessionAttestation);
+      // Store credentials securely (prefer long-lived credential token)
+      final credential = response.credentialToken ?? response.sessionAttestation;
+      await _storage.saveCredential(credential);
       await _storage.saveUserId(response.userId);
       await _storage.setEnrolled(true); // Mark user as enrolled
+
+      // Update API service with new credential immediately
+      ServiceLocator.apiService.setCredential(credential);
 
       // Navigate to dashboard
       if (mounted) {

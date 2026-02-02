@@ -18,7 +18,7 @@ declare global {
  */
 export function requireCredential(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) {
   try {
@@ -49,7 +49,7 @@ export function requireCredential(
  * DEVELOPMENT MODE: Authentication is disabled for easier development
  * PRODUCTION MODE: Will require proper authentication
  */
-export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   // Skip authentication in development mode
   if (process.env.NODE_ENV === 'development') {
     console.log('⚠️  DEV MODE: Admin authentication bypassed');

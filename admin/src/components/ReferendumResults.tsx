@@ -170,7 +170,7 @@ export default function ReferendumResults({ results, referendumQuestion, thresho
                   outerRadius={100}
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(((percent ?? 0) * 100)).toFixed(0)}%`}
                   labelLine={true}
                 >
                   {pieData.map((entry, index) => (
@@ -178,7 +178,7 @@ export default function ReferendumResults({ results, referendumQuestion, thresho
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [value.toLocaleString(), 'Votes']}
+                  formatter={(value?: number) => [(value ?? 0).toLocaleString(), 'Votes']}
                 />
               </PieChart>
             </ResponsiveContainer>

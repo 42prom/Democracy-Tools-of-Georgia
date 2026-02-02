@@ -15,14 +15,26 @@ router.post(
   '/challenge',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { deviceId } = req.body;
+      const { deviceId, purpose } = req.body;
 
-      if (!deviceId) {
+      const noncePurpose = (typeof purpose === 'string' && purpose.trim().length > 0)
+        ? purpose.trim()
+        : 'challenge';
+
+      // For voting we need a nonce with purpose 'vote' (used by NonceService.verifyAndConsume)
+      const allowedPurposes = new Set(['challenge', 'vote']);
+      if (!allowedPurposes.has(noncePurpose)) {
+        throw createError('Invalid purpose', 400);
+      }
+
+      // deviceId is optional for now (kept for compatibility / future device binding)
+      if (!deviceId && noncePurpose === 'challenge') {
         throw createError('deviceId is required', 400);
       }
 
       // Generate nonce with 60s TTL
-      const nonce = await NonceService.generateNonce('challenge');
+      const purposeTyped = noncePurpose as 'challenge' | 'vote';
+      const nonce = await NonceService.generateNonce(purposeTyped);
 
       const response: ChallengeResponse = {
         nonce,

@@ -1,0 +1,22 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { getVerificationSettingsPublic } from '../services/verificationSettings';
+
+const router = Router();
+
+/**
+ * GET /api/v1/settings/verification
+ * Public read-only verification policy (no secrets)
+ */
+router.get(
+  '/verification',
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const settings = await getVerificationSettingsPublic();
+      res.json(settings);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;

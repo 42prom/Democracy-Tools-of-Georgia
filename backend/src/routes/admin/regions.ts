@@ -16,7 +16,7 @@ router.use(requireAdmin);
  * GET /api/v1/admin/regions
  * List all regions
  */
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await pool.query(
       'SELECT * FROM regions ORDER BY name_en ASC'
@@ -79,7 +79,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     }
     if (parent_region_id !== undefined) {
       updates.push(`parent_region_id = $${paramCount++}`);
-      values.push(parent_region_id);
+      values.push(parent_region_id === '' ? null : parent_region_id);
     }
     if (active !== undefined) {
       updates.push(`active = $${paramCount++}`);
@@ -175,7 +175,7 @@ router.post('/import', upload.single('file'), async (req: Request, res: Response
                name_ka = EXCLUDED.name_ka,
                parent_region_id = EXCLUDED.parent_region_id,
                active = EXCLUDED.active`,
-          [region.code, region.name_en, region.name_ka, region.parent_region_id, region.active]
+          [region.code, region.name_en, region.name_ka, (region.parent_region_id === '' ? null : region.parent_region_id), region.active]
         );
         imported++;
       } catch (err: any) {

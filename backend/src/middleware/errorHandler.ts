@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 
 export interface AppError extends Error {
   statusCode?: number;
+  code?: string;
+  details?: unknown;
   isOperational?: boolean;
 }
 
@@ -13,7 +15,7 @@ export function errorHandler(
   err: AppError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) {
   // Default to 500 server error
   const statusCode = err.statusCode || 500;
@@ -36,6 +38,13 @@ export function errorHandler(
       statusCode,
     },
   };
+
+  if (err.code) {
+    response.error.code = err.code;
+  }
+  if (err.details !== undefined) {
+    response.error.details = err.details;
+  }
 
   // Only include stack trace in development
   if (process.env.NODE_ENV === 'development') {
@@ -64,6 +73,23 @@ export function notFoundHandler(req: Request, res: Response) {
 export function createError(message: string, statusCode: number): AppError {
   const error: AppError = new Error(message);
   error.statusCode = statusCode;
+  error.isOperational = true;
+  return error;
+}
+
+/**
+ * Create an operational error with a stable machine-readable code.
+ */
+export function createErrorWithCode(
+  code: string,
+  message: string,
+  statusCode: number,
+  details?: unknown
+): AppError {
+  const error: AppError = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  error.details = details;
   error.isOperational = true;
   return error;
 }
