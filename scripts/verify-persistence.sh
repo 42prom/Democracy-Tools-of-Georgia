@@ -3,20 +3,24 @@
 # Tests that regions and profiles persist across server restarts.
 #
 # Prerequisites:
-#   - PostgreSQL running on localhost:5432 (docker-compose up postgres)
-#   - psql client installed (or use docker exec)
+#   - Docker container 'DTG-postgres' running
 #
 # Usage:
 #   bash scripts/verify-persistence.sh
 
 set -e
 
-DB_URL="${DATABASE_URL:-postgresql://dtfg_user:dtfg_dev_password@localhost:5432/dtfg}"
+# DB_URL is not used with docker exec, but we keep the var for reference if needed later
+DB_USER="DTG_user"
+DB_NAME="DTG"
+CONTAINER_NAME="DTG-postgres"
+
 PASS=0
 FAIL=0
 
 run_sql() {
-  psql "$DB_URL" -t -A -c "$1" 2>/dev/null
+  # Use docker exec to avoid local psql dependency and auth issues
+  docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "$1" 2>/dev/null
 }
 
 check() {
@@ -37,13 +41,19 @@ echo ""
 
 # -------------------------------------------------------
 echo "1. Checking database connection..."
-DB_OK=$(run_sql "SELECT 1" || echo "error")
-if [ "$DB_OK" != "1" ]; then
-  echo "  ERROR: Cannot connect to database at $DB_URL"
-  echo "  Make sure PostgreSQL is running: docker-compose up -d postgres"
+# We check if container is running first
+if ! docker ps | grep -q "$CONTAINER_NAME"; then
+  echo "  ERROR: Container $CONTAINER_NAME is not running."
+  echo "  Run: docker-compose up -d postgres"
   exit 1
 fi
-echo "  OK: Connected to database"
+
+DB_OK=$(run_sql "SELECT 1" || echo "error")
+if [ "$DB_OK" != "1" ]; then
+  echo "  ERROR: Cannot connect to database inside $CONTAINER_NAME"
+  exit 1
+fi
+echo "  OK: Connected to database ($CONTAINER_NAME)"
 echo ""
 
 # -------------------------------------------------------
@@ -101,9 +111,10 @@ echo ""
 
 # -------------------------------------------------------
 echo "6. Checking Docker volume persistence..."
+# Use grep loosely to find any volume containing "postgres_data"
 VOL_EXISTS=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -c "postgres_data" || echo "0")
 if [ "$VOL_EXISTS" -ge 1 ]; then
-  echo "  OK: Docker volume 'postgres_data' exists (data survives container restarts)"
+  echo "  OK: Docker volume(s) found for postgres_data (data survives container restarts)"
 else
   echo "  WARN: Docker volume 'postgres_data' not found (are you using Docker?)"
 fi

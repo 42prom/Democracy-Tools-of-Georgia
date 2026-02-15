@@ -5,6 +5,8 @@ export interface AppError extends Error {
   code?: string;
   details?: unknown;
   isOperational?: boolean;
+  retryAfter?: number;
+  resetAt?: Date;
 }
 
 /**
@@ -31,6 +33,17 @@ export function errorHandler(
     stack: err.stack,
   });
 
+  // Special logging for the current investigation
+  if (message && message.includes('length')) {
+    const report = `\n\n[${new Date().toISOString()}] CRASH REPORT:\nMessage: ${message}\nStack: ${err.stack}\n========================\n\n`;
+    console.error(report);
+    try {
+      require('fs').appendFileSync('DEBUG_POLL_SAFE.txt', report);
+    } catch (e) {
+      console.error('Failed to write crash log:', e);
+    }
+  }
+
   // Send sanitized error response
   const response: any = {
     error: {
@@ -44,6 +57,14 @@ export function errorHandler(
   }
   if (err.details !== undefined) {
     response.error.details = err.details;
+  }
+
+  // Include rate limit information if present
+  if (err.retryAfter !== undefined) {
+    response.error.retryAfter = err.retryAfter;
+  }
+  if (err.resetAt !== undefined) {
+    response.error.resetAt = err.resetAt;
   }
 
   // Only include stack trace in development

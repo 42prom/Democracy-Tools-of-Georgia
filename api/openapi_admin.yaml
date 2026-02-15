@@ -1,0 +1,394 @@
+openapi: 3.0.0
+info:
+  title: DTG Admin API
+  version: 1.0.0
+  description: Admin API for Democracy Tools of Georgia
+servers:
+  - url: /api/v1
+
+paths:
+  # =============================================================================
+  # Admin Authentication
+  # =============================================================================
+  /admin/auth/login:
+    post:
+      summary: Admin login
+      tags: [Admin Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+
+  /admin/auth/me:
+    get:
+      summary: Get current admin user
+      tags: [Admin Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+
+  # =============================================================================
+  # Polls Management
+  # =============================================================================
+  /admin/polls:
+    get:
+      summary: List all polls
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Polls list
+
+    post:
+      summary: Create new poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PollCreate"
+      responses:
+        "201":
+          description: Created
+
+  /admin/polls/{id}:
+    get:
+      summary: Get poll details
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Poll details
+
+    put:
+      summary: Update poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      summary: Delete poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/polls/{id}/publish:
+    patch:
+      summary: Publish a poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Published
+
+  /admin/polls/{id}/close:
+    patch:
+      summary: Close a poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Closed
+
+  /admin/polls/{id}/survey-results:
+    get:
+      summary: Get survey results for a poll
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Survey results
+
+  /admin/polls/estimate:
+    post:
+      summary: Estimate audience size for targeting
+      tags: [Admin Polls]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudienceFilter"
+      responses:
+        "200":
+          description: Estimate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudienceEstimate"
+
+  # =============================================================================
+  # Insights / Analytics
+  # =============================================================================
+  /admin/insights/polls/{id}:
+    get:
+      summary: Get detailed poll analytics
+      tags: [Admin Insights]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Analytics data
+
+  # =============================================================================
+  # Profiles Management
+  # =============================================================================
+  /admin/profiles:
+    get:
+      summary: List user profiles (anonymized)
+      tags: [Admin Profiles]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profiles list
+
+  # =============================================================================
+  # Regions Management
+  # =============================================================================
+  /admin/regions:
+    get:
+      summary: List regions
+      tags: [Admin Regions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Regions list
+
+  # =============================================================================
+  # Messages Management
+  # =============================================================================
+  /admin/messages:
+    get:
+      summary: List all messages
+      tags: [Admin Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Messages list
+
+    post:
+      summary: Create message
+      tags: [Admin Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+
+  /admin/messages/{id}:
+    put:
+      summary: Update message
+      tags: [Admin Messages]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      summary: Delete message
+      tags: [Admin Messages]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/messages/{id}/publish:
+    patch:
+      summary: Publish message
+      tags: [Admin Messages]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Published
+
+  # =============================================================================
+  # Settings
+  # =============================================================================
+  /admin/settings:
+    get:
+      summary: Get all settings
+      tags: [Admin Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+
+    put:
+      summary: Update settings
+      tags: [Admin Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated
+
+  # =============================================================================
+  # Security Events
+  # =============================================================================
+  /admin/security-events:
+    get:
+      summary: List security events
+      tags: [Admin Security]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Security events
+
+  # =============================================================================
+  # Export
+  # =============================================================================
+  /admin/export/polls/{id}:
+    get:
+      summary: Export poll data
+      tags: [Admin Export]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Export data
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        role: { type: string }
+        fullName: { type: string }
+
+    PollCreate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+        audienceFilter:
+          $ref: "#/components/schemas/AudienceFilter"
+
+    AudienceFilter:
+      type: object
+      properties:
+        genders: { type: array, items: { type: string } }
+        ageBuckets: { type: array, items: { type: string } }
+        regionCodes: { type: array, items: { type: string } }
+
+    AudienceEstimate:
+      type: object
+      properties:
+        count: { type: integer }
+        isPrivacySafe: { type: boolean }

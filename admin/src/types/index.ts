@@ -1,4 +1,21 @@
-export type PollStatus = 'draft' | 'active' | 'closed';
+export interface LoginRequest {
+  email: string;
+  password?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AdminUser;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: 'superadmin' | 'admin' | 'moderator' | 'observer';
+  fullName?: string;
+}
+
+export type PollStatus = 'draft' | 'scheduled' | 'active' | 'ended' | 'archived';
 export type PollType = 'election' | 'referendum' | 'survey';
 
 export interface AudienceRules {
@@ -141,6 +158,18 @@ export interface SecurityEvent {
   count: number | string;
   firstSeen?: string;
   lastSeen?: string;
+  biometricScores?: {
+    faceMatch: {
+      avg: string | null;
+      min: string | null;
+      max: string | null;
+    };
+    liveness: {
+      avg: string | null;
+      min: string | null;
+      max: string | null;
+    };
+  };
 }
 
 export interface SecurityEventsSummary {

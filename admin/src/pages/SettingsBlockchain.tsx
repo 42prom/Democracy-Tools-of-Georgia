@@ -18,51 +18,53 @@ export default function SettingsBlockchain() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settings, setSettings] = useState<AdminSettings>(DEFAULTS);
 
-  const errorMessage = (e: unknown) => {
-    type ErrShape = {
-      message?: unknown;
-      response?: {
-        data?: {
-          error?: unknown;
-        };
-      };
-    };
-    const err = e as ErrShape;
-    const apiErr = err.response?.data?.error;
-    if (typeof apiErr === 'string' && apiErr.trim()) return apiErr;
-    if (typeof err.message === 'string' && err.message.trim()) return err.message;
-    return 'Unexpected error';
-  };
-
   useEffect(() => {
-    (async () => {
-      try {
-        const s = await settingsApi.get();
-        setSettings({ ...DEFAULTS, ...s, reward_token_id: 1 });
-      } catch (e: unknown) {
-        // Keep page usable even if backend endpoint isn't present yet
-        setError(errorMessage(e) || 'Failed to load settings');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadSettings();
   }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const data = await settingsApi.get();
+      // Merge with defaults to ensure all fields exist
+      setSettings(s => ({ ...s, ...data }));
+    } catch (error: any) {
+       console.error('Failed to load settings:', error);
+       setError(errorMessage(error) || 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onSave = async () => {
     setSaving(true);
     setError('');
     try {
-      const updated = await settingsApi.update({
-        ...settings,
-        reward_token_id: 1,
-      });
-      setSettings({ ...DEFAULTS, ...updated, reward_token_id: 1 });
-    } catch (e: unknown) {
+      await settingsApi.update(settings);
+    } catch (e: any) {
       setError(errorMessage(e) || 'Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const errorMessage = (e: any) => e.response?.data?.error || e.message;
+
+  const onTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    setError('');
+    try {
+      const res = await settingsApi.testBlockchainConnection(settings.rpc_url);
+      setTestResult(res);
+    } catch (e: unknown) {
+      setError(errorMessage(e) || 'Connection test failed');
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -85,7 +87,18 @@ export default function SettingsBlockchain() {
                 </div>
               )}
 
+              {testResult && (
+                <div className={`mt-4 rounded border p-3 text-sm ${
+                  testResult.success 
+                    ? 'border-green-200 bg-green-50 text-green-700' 
+                    : 'border-red-200 bg-red-50 text-red-700'
+                }`}>
+                  {testResult.message}
+                </div>
+              )}
+
               <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+{/* ... grid content ... */}
                 <label className="flex items-center gap-2 text-sm text-gray-800">
                   <input
                     type="checkbox"
@@ -125,9 +138,18 @@ export default function SettingsBlockchain() {
 
                 <div className="md:col-span-2">
                   <Input
-                    label="ERC-1155 Contract Address"
+                    label="ERC-1155 Contract Address (Rewards NFT)"
                     value={settings.nft_contract_address}
                     onChange={(e) => setSettings((s) => ({ ...s, nft_contract_address: e.target.value }))}
+                    placeholder="0x..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <Input
+                    label="DTG Token Address (ERC-20)"
+                    value={settings.dtg_token_address || ''}
+                    onChange={(e) => setSettings((s) => ({ ...s, dtg_token_address: e.target.value }))}
                     placeholder="0x..."
                   />
                 </div>
@@ -151,8 +173,11 @@ export default function SettingsBlockchain() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <Button onClick={onSave} disabled={saving}>
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="secondary" onClick={onTest} disabled={testing || saving}>
+                  {testing ? 'Testing…' : 'Test connection'}
+                </Button>
+                <Button onClick={onSave} disabled={saving || testing}>
                   {saving ? 'Saving…' : 'Save'}
                 </Button>
               </div>

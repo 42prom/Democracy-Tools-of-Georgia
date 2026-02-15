@@ -1,4 +1,4 @@
-# DTFG Threat Model
+# DTG Threat Model
 
 ## Methodology: STRIDE + Module Analysis
 
@@ -57,3 +57,4 @@
 2.  **Credential Secret**: Stored in Device Secure Enclave.
 3.  **Vote Database**: Integrity is paramount.
 4.  **Admin Credentials**: Protected by MFA.
+

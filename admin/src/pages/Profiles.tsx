@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Users, Search, Download, Upload, X, Eye, Filter } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, Search, Download, Upload, X, Eye, Filter, RefreshCw, Trash2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { profilesApi } from '../api/client';
-import type { UserProfile, ProfileFilters } from '../types';
+import { profilesApi, regionsApi } from '../api/client';
+import type { UserProfile, ProfileFilters, Region } from '../types';
 
 export default function Profiles() {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -16,23 +16,23 @@ export default function Profiles() {
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
-  const [participationRecords, setParticipationRecords] = useState<any[]>([]);
-  const [participationMetadata, setParticipationMetadata] = useState<any>(null);
+  const [participationRecords, setParticipationRecords] = useState<{
+    pollTitle: string;
+    participated: boolean;
+    participationDate?: string;
+  }[]>([]);
+  const [participationMetadata, setParticipationMetadata] = useState<{
+    lastLoginAt?: string;
+    enrolledAt?: string;
+    notificationsEnabled?: boolean;
+  } | null>(null);
   const [loadingParticipation, setLoadingParticipation] = useState(false);
   const [editingRegion, setEditingRegion] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [updatingRegion, setUpdatingRegion] = useState(false);
-  const [availableRegions] = useState([
-    { code: 'reg_tbilisi', name: 'Tbilisi' },
-    { code: 'reg_batumi', name: 'Batumi' },
-    { code: 'reg_kutaisi', name: 'Kutaisi' },
-    { code: 'reg_rustavi', name: 'Rustavi' },
-    { code: 'reg_gori', name: 'Gori' },
-    { code: 'reg_zugdidi', name: 'Zugdidi' },
-    { code: 'reg_poti', name: 'Poti' },
-    { code: 'reg_telavi', name: 'Telavi' },
-    { code: 'reg_kobuleti', name: 'Kobuleti' },
-  ]);
+  const [availableRegions, setAvailableRegions] = useState<Region[]>([]);
+  const [resettingSecurity, setResettingSecurity] = useState(false);
+  const [resettingEnrollment, setResettingEnrollment] = useState(false);
 
   // Filter state
   const [filters, setFilters] = useState<ProfileFilters>({
@@ -44,11 +44,28 @@ export default function Profiles() {
     lastLoginEnd: undefined,
   });
 
+  // Load regions on mount
   useEffect(() => {
-    loadProfiles();
-  }, [page, filters]);
+    const loadRegions = async () => {
+      try {
+        const regions = await regionsApi.list();
+        setAvailableRegions(regions);
+      } catch (error) {
+        console.error('Failed to load regions:', error);
+      }
+    };
+    loadRegions();
+  }, []);
 
-  const loadProfiles = async () => {
+  // Helper to get region name from Code or UUID
+  const getRegionName = useCallback((regionId: string | undefined): string => {
+    if (!regionId) return 'Unknown';
+    // Try to find by code first, then by if
+    const region = availableRegions.find(r => r.code === regionId || r.id === regionId);
+    return region ? region.name_en : regionId;
+  }, [availableRegions]);
+
+  const loadProfiles = useCallback(async () => {
     setLoading(true);
     try {
       const response = await profilesApi.list({
@@ -59,7 +76,7 @@ export default function Profiles() {
         sortOrder: 'desc',
       });
       setProfiles(response.profiles);
-      setTotalCount(response.total);
+      setTotalCount(typeof response.total === 'number' ? response.total : response.profiles.length);
       setTotalPages(response.totalPages);
     } catch (error) {
       console.error('Failed to load profiles:', error);
@@ -67,7 +84,11 @@ export default function Profiles() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, page, pageSize]);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles, page, filters]);
 
   const handleSearch = () => {
     setFilters({ ...filters, search: searchQuery });
@@ -206,6 +227,76 @@ export default function Profiles() {
     }
   };
 
+  const handleResetSecurity = async () => {
+    if (!selectedProfile) return;
+
+    const confirmMsg = `This will reset security limits for ${selectedProfile.name || 'this user'}:\n\n` +
+      `• Clear device-voter associations\n` +
+      `• Clear rate limit records\n\n` +
+      `The user will be able to re-attempt verification.\n\nContinue?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setResettingSecurity(true);
+
+    // Debug: Log the request details
+    const apiUrl = `/api/v1/admin/profiles/${selectedProfile.id}/reset-security`;
+    console.log('[Reset Security] Making request to:', apiUrl);
+    console.log('[Reset Security] Profile ID:', selectedProfile.id);
+    console.log('[Reset Security] Token present:', !!(localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken')));
+
+    try {
+      const result = await profilesApi.resetSecurity(selectedProfile.id, false);
+      alert(`Security reset successful:\n\n${result.actions.join('\n')}`);
+    } catch (error: any) {
+      console.error('Failed to reset security:', error);
+      console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('Response data:', error?.response?.data);
+      console.error('Response status:', error?.response?.status);
+      console.error('Request URL:', error?.config?.url);
+      console.error('Request baseURL:', error?.config?.baseURL);
+
+      const errData = error?.response?.data?.error;
+      const errMsg = errData?.message || errData || error?.message || 'Unknown error';
+      const errPath = errData?.path || error?.config?.url || 'unknown';
+      const errStatus = error?.response?.status || 'unknown';
+      alert(`Failed to reset security limits:\n\nStatus: ${errStatus}\nPath: ${errPath}\nError: ${errMsg}\n\nCheck browser console for more details.`);
+    } finally {
+      setResettingSecurity(false);
+    }
+  };
+
+  const handleResetEnrollment = async () => {
+    if (!selectedProfile) return;
+
+    const confirmMsg = `WARNING: This will DELETE the user "${selectedProfile.name} ${selectedProfile.surname}" completely!\n\n` +
+      `• All poll participations will be deleted\n` +
+      `• All rewards will be deleted\n` +
+      `• The user record will be removed\n\n` +
+      `The user can then re-enroll from their phone with their ID card.\n\n` +
+      `This action CANNOT be undone. Continue?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setResettingEnrollment(true);
+    try {
+      const result = await profilesApi.resetEnrollment(selectedProfile.id);
+      alert(`Enrollment reset successful!\n\n${result.deletedUser.name} (${result.deletedUser.maskedPn}) can now re-enroll.\n\n${result.actions.join('\n')}`);
+      // Close modal and refresh list since user was deleted
+      setSelectedProfile(null);
+      loadProfiles();
+    } catch (error: any) {
+      console.error('Failed to reset enrollment:', error);
+      const errData = error?.response?.data?.error;
+      const errMsg = errData?.message || errData || error?.message || 'Unknown error';
+      const errPath = errData?.path || 'unknown';
+      const errStatus = error?.response?.status || 'unknown';
+      alert(`Failed to reset enrollment:\n\nStatus: ${errStatus}\nPath: ${errPath}\nError: ${errMsg}`);
+    } finally {
+      setResettingEnrollment(false);
+    }
+  };
+
   if (loading && page === 1) {
     return (
       <div className="p-6">
@@ -290,7 +381,7 @@ export default function Profiles() {
                   </label>
                   <select
                     value={filters.genderBucket || ''}
-                    onChange={(e) => setFilters({ ...filters, genderBucket: e.target.value as any || undefined })}
+                    onChange={(e) => setFilters({ ...filters, genderBucket: (e.target.value as 'M' | 'F' | 'Other') || undefined })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">All Genders</option>
@@ -418,9 +509,9 @@ export default function Profiles() {
                   <td className="py-3 px-4 text-sm text-gray-700">
                     {profile.surname || '-'}
                   </td>
-                  <td className="py-3 px-4 text-sm text-gray-700">{profile.ageBucket}</td>
-                  <td className="py-3 px-4 text-sm text-gray-700">{profile.genderBucket}</td>
-                  <td className="py-3 px-4 text-sm text-gray-700">{profile.regionBucket}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{profile.ageBucket || 'Unknown'}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{profile.genderBucket || 'Unknown'}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{getRegionName(profile.regionBucket)}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-2">
                       <button
@@ -573,9 +664,10 @@ export default function Profiles() {
                             className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                             disabled={updatingRegion}
                           >
+                            <option value="">Select Region</option>
                             {availableRegions.map((region) => (
-                              <option key={region.code} value={region.code}>
-                                {region.name}
+                              <option key={region.id} value={region.code}>
+                                {region.name_en}
                               </option>
                             ))}
                           </select>
@@ -599,9 +691,7 @@ export default function Profiles() {
                         </div>
                       ) : (
                         <p className="text-sm text-gray-900 mt-1">
-                          {availableRegions.find((r) => r.code === selectedProfile.regionBucket)?.name ||
-                            selectedProfile.regionBucket ||
-                            '-'}
+                          {getRegionName(selectedProfile.regionBucket)}
                         </p>
                       )}
                     </div>
@@ -653,6 +743,40 @@ export default function Profiles() {
                       </tbody>
                     </table>
                   )}
+                </div>
+
+                {/* Reset Security Button */}
+                <div className="pt-4 border-t border-gray-200">
+                  <Button
+                    variant="secondary"
+                    onClick={handleResetSecurity}
+                    disabled={resettingSecurity}
+                    className="w-full justify-center"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${resettingSecurity ? 'animate-spin' : ''}`} />
+                    {resettingSecurity ? 'Resetting...' : 'Reset Security Limits'}
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Clears rate limits, IP blocks, and device restrictions.
+                    User can re-attempt biometric verification.
+                  </p>
+                </div>
+
+                {/* Reset Enrollment Button (for testing) */}
+                <div className="pt-4 border-t border-gray-200">
+                  <Button
+                    variant="secondary"
+                    onClick={handleResetEnrollment}
+                    disabled={resettingEnrollment}
+                    className="w-full justify-center bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                  >
+                    <Trash2 className={`w-4 h-4 mr-2 ${resettingEnrollment ? 'animate-pulse' : ''}`} />
+                    {resettingEnrollment ? 'Deleting...' : 'Reset Enrollment (Delete User)'}
+                  </Button>
+                  <p className="text-xs text-red-600 mt-2 text-center">
+                    Deletes user completely. They can re-enroll with their ID card.
+                    Use for testing or when enrollment is stuck.
+                  </p>
                 </div>
 
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">

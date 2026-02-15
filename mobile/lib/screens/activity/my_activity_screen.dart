@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/activity_item.dart';
+import '../../services/interfaces/i_api_service.dart';
+import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
 import 'activity_detail_screen.dart';
 
@@ -12,8 +14,10 @@ class MyActivityScreen extends StatefulWidget {
 
 class _MyActivityScreenState extends State<MyActivityScreen> {
   final StorageService _storageService = StorageService();
+  final IApiService _api = ServiceLocator.apiService;
   List<ActivityItem> _items = [];
   bool _loading = true;
+  bool _isOffline = false;
   String _searchQuery = '';
 
   @override
@@ -24,12 +28,41 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final items = await _storageService.getActivityItems();
-    if (mounted) {
+
+    // 1. Load from local cache immediately (instant UI)
+    final cachedItems = await _storageService.getActivityItems();
+    if (mounted && cachedItems.isNotEmpty) {
       setState(() {
-        _items = items;
+        _items = cachedItems;
         _loading = false;
       });
+    }
+
+    // 2. Fetch from API (source of truth)
+    try {
+      final apiItems = await _api.getMyActivity();
+      if (mounted) {
+        setState(() {
+          _items = apiItems;
+          _loading = false;
+          _isOffline = false;
+        });
+      }
+
+      // 3. Update local cache with API data
+      await _storageService.clearActivityItems();
+      for (final item in apiItems) {
+        await _storageService.saveActivityItem(item);
+      }
+    } catch (e) {
+      debugPrint('[MyActivity] API fetch failed: $e');
+      // Keep cached data, mark as offline
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _isOffline = true;
+        });
+      }
     }
   }
 
@@ -43,6 +76,29 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Offline indicator
+        if (_isOffline)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+            color: Colors.orange.shade100,
+            child: Row(
+              children: [
+                Icon(Icons.cloud_off, size: 16, color: Colors.orange.shade800),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Showing cached data (offline)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         // Search bar
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -53,7 +109,10 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 0,
+                horizontal: 12,
+              ),
               isDense: true,
             ),
             onChanged: (v) => setState(() => _searchQuery = v),
@@ -82,18 +141,16 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
             const SizedBox(height: 16),
             Text(
               'No activity yet',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: Colors.grey),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.grey),
             ),
             const SizedBox(height: 8),
             Text(
               'Your votes and survey submissions\nwill appear here.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.grey),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
           ],
@@ -105,10 +162,9 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
       return Center(
         child: Text(
           'No results match your search.',
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: Colors.grey),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
         ),
       );
     }
@@ -145,7 +201,9 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ended = item.hasEnded;
-    final typeLabel = item.type[0].toUpperCase() + item.type.substring(1);
+    final typeLabel = item.type.isEmpty
+        ? ''
+        : item.type[0].toUpperCase() + item.type.substring(1);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -154,14 +212,12 @@ class _ActivityTile extends StatelessWidget {
           item.type == 'survey' ? Icons.assignment : Icons.how_to_vote,
           color: Theme.of(context).primaryColor,
         ),
-        title: Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          '$typeLabel  •  ${_formatDate(item.votedAt)}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+          '$typeLabel  •  ${_formatDate(item.votedAt)}${item.rewardAmount != null ? "  •  +${item.rewardAmount} ${item.rewardToken}" : ""}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.grey),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

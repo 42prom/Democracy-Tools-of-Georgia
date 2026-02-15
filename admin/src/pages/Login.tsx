@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { authApi } from '../api/client'
 
 interface LoginProps {
   onLogin: () => void
@@ -11,18 +12,23 @@ export default function Login({ onLogin }: LoginProps) {
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    // Phase 0: Mock authentication
-    if (email === 'admin@dtfg.ge' && password === 'phase0password') {
-      localStorage.setItem('adminToken', 'phase0password')
-      localStorage.setItem('admin_token', 'phase0password')
+    // Real authentication
+    try {
+      const response = await authApi.login({ email, password })
+      
+      localStorage.setItem('adminToken', response.token)
+      localStorage.setItem('admin_token', response.token)
+      localStorage.setItem('adminUser', JSON.stringify(response.user))
+      
       onLogin()
       navigate('/')
-    } else {
-      setError('Invalid credentials')
+    } catch (err: any) {
+      console.error('Login failed:', err)
+      setError(err.response?.data?.error?.message || 'Invalid credentials')
     }
   }
 
@@ -31,7 +37,7 @@ export default function Login({ onLogin }: LoginProps) {
       <div className="max-w-md w-full space-y-8 p-8 bg-gray-800 rounded-lg shadow-lg">
         <div>
           <h2 className="text-center text-3xl font-bold text-white">
-            DTFG Admin
+            DTG Admin
           </h2>
           <p className="mt-2 text-center text-sm text-gray-400">
             Phase 0 - Mock Authentication
@@ -54,7 +60,7 @@ export default function Login({ onLogin }: LoginProps) {
                 type="email"
                 required
                 className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-facebook-blue focus:border-transparent"
-                placeholder="admin@dtfg.ge"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -69,7 +75,7 @@ export default function Login({ onLogin }: LoginProps) {
                 type="password"
                 required
                 className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-facebook-blue focus:border-transparent"
-                placeholder="phase0password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -84,10 +90,11 @@ export default function Login({ onLogin }: LoginProps) {
           </button>
 
           <div className="text-xs text-gray-400 text-center">
-            Default: admin@dtfg.ge / phase0password
+            Contact your administrator for credentials
           </div>
         </form>
       </div>
     </div>
   )
 }
+

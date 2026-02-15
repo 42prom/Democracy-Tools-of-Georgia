@@ -16,5 +16,8 @@ module.exports = {
       lines: 70,
       statements: 70
     }
-  }
+  },
+  moduleNameMapper: {
+    '^uuid$': '<rootDir>/tests/__mocks__/uuid.ts',
+  },
 };

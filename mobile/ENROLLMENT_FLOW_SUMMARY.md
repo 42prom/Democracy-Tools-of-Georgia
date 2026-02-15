@@ -84,7 +84,7 @@ class AuthApi {
   static const String baseUrl = 'http://localhost:3000/api/v1';
 
   // For production:
-  // static const String baseUrl = 'https://api.dtfg.ge/api/v1';
+  // static const String baseUrl = 'https://api.DTG.ge/api/v1';
 
   // For testing on physical device:
   // static const String baseUrl = 'http://192.168.1.100:3000/api/v1';
@@ -553,3 +553,4 @@ final _faceMatcher = AlwaysPassFaceMatcher(); // Always pass
 ✅ **Comprehensive test checklist** for new and returning users
 
 The mobile enrollment flow is **production-ready for Phase 0 MVP** with mock verification services that can be seamlessly replaced with real ML/SDK implementations in Phase 1.
+

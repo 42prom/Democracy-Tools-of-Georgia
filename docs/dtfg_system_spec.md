@@ -1,4 +1,4 @@
-# Democratic Tools for Georgia (DTFG) - System Specification
+# Democracy Tools Of Georgia (DTG) - System Specification
 
 ## 1. Assumptions
 
@@ -26,9 +26,9 @@
 | Term                    | Schema / Key     | Version | Description                                                |
 | :---------------------- | :--------------- | :------ | :--------------------------------------------------------- |
 | **API Base URL**        | `/api/v1`        | v1      | Root for all REST endpoints                                |
-| **Voting Credential**   | `dtfg.vc.v1`     | v1      | Device-bound credential with buckets (age, gender, region) |
-| **Session Attestation** | `dtfg.att.v1`    | v1      | Proof of liveness/auth for a specific action               |
-| **Database Schema**     | `dtfg.schema.v1` | v1      | Database versioning tag                                    |
+| **Voting Credential**   | `DTG.vc.v1`     | v1      | Device-bound credential with buckets (age, gender, region) |
+| **Session Attestation** | `DTG.att.v1`    | v1      | Proof of liveness/auth for a specific action               |
+| **Database Schema**     | `DTG.schema.v1` | v1      | Database versioning tag                                    |
 | **Poll ID**             | `poll_{uuid}`    | -       | Unique identifier for polls                                |
 | **Ballot ID**           | `ballot_{uuid}`  | -       | Unique identifier for a specific ballot within a poll      |
 | **Nullifier**           | `null_{hash}`    | -       | Deterministic hash to prevent double voting                |
@@ -139,7 +139,7 @@
 
 ## 8. Data Model
 
-`dtfg.schema.v1`
+`DTG.schema.v1`
 
 ### 8.1. Database Schema (Conceptual)
 
@@ -157,7 +157,7 @@
 
 ```json
 {
-  "iss": "dtfg-identity-service",
+  "iss": "DTG-identity-service",
   "sub": "device_key_thumbprint",
   "data": {
     "age_bucket": "18-25",
@@ -187,7 +187,7 @@ Base: `/api/v1`
 - **Wallet**: `SimpleAccount` (ERC-4337) or Modular Account (ERC-7579).
   - Owner: User's Device Key.
 - **Paymaster**: Verifying Paymaster.
-  - Signer: DTFG Backend.
+  - Signer: DTG Backend.
   - Rule: Valid signature from Backend required to sponsor gas. Backend only signs if Vote is valid.
 - **Rewards**:
   - Simple `ERC20` or `MerkleDistributor` if batching.
@@ -287,3 +287,4 @@ Base: `/api/v1`
 - **ADR-001**: **Use NFC + Liveness for every vote.** _Why_: Max integrity. _Tradeoff_: High friction.
 - **ADR-002**: **Server-side Aggregation (Phase 1).** _Why_: ZK client-side tally is too complex for MVP timeline. _Tradeoff_: Trust in server code (mitigated by partial trust arch).
 - **ADR-003**: **Nullifiers via Device Secret.** _Why_: Preventing double votes without tracking identity.
+

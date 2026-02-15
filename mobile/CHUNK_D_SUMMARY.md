@@ -161,7 +161,7 @@ class SendScreen extends StatefulWidget {
 
 **Features**:
 - **Address input**: Text field with paste and scan buttons
-- **Token selector**: Dropdown (Phase 0: DTFG only, Phase 1: multi-token)
+- **Token selector**: Dropdown (Phase 0: DTG only, Phase 1: multi-token)
 - **Amount input**: Numeric keyboard with validation
 - **Confirmation dialog**: Shows to/amount/warning before sending
 - **Transaction submission**: Calls WalletService.sendTokens()
@@ -365,7 +365,7 @@ share_plus: ^10.1.4
 ┌─────────────────────────────────────────────────────────────┐
 │ Navigate to SendScreen                                     │
 │ - Recipient address field (paste/scan)                     │
-│ - Token selector (DTFG)                                    │
+│ - Token selector (DTG)                                    │
 │ - Amount input                                             │
 │ - "Send" button                                            │
 └─────────────────────────────────────────────────────────────┘
@@ -406,7 +406,7 @@ share_plus: ^10.1.4
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ User enters recipient address (paste or scan QR)           │
-│ Selects token (DTFG)                                       │
+│ Selects token (DTG)                                       │
 │ Enters amount                                              │
 │ Taps "Send"                                                │
 └─────────────────┬───────────────────────────────────────────┘
@@ -415,7 +415,7 @@ share_plus: ^10.1.4
 ┌─────────────────────────────────────────────────────────────┐
 │ Show Confirmation Dialog                                   │
 │ - To: 0x123...456                                          │
-│ - Amount: 25.50 DTFG                                       │
+│ - Amount: 25.50 DTG                                       │
 │ - Warning: "This action cannot be undone."                 │
 │ - "Cancel" / "Confirm" buttons                             │
 └─────────────────┬───────────────────────────────────────────┘
@@ -467,7 +467,7 @@ share_plus: ^10.1.4
 ┌─────────────────────────────────────────────────────────────┐
 │ Auto-navigate to SendScreen                                │
 │ - Recipient address PRE-FILLED with scanned address        │
-│ - Token selector (DTFG)                                    │
+│ - Token selector (DTG)                                    │
 │ - Amount input (empty - user fills)                        │
 └─────────────────┬───────────────────────────────────────────┘
                   │
@@ -554,7 +554,7 @@ flutter run
 1. Tap "Send" button
 2. If locked → Enter PIN or use biometric
 3. Enter recipient address (or tap paste/scan)
-4. Select token (DTFG)
+4. Select token (DTG)
 5. Enter amount (e.g., "10.50")
 6. Tap "Send"
 7. See confirmation dialog
@@ -603,7 +603,7 @@ flutter test test/wallet_mvp_test.dart
 - [ ] Secure storage for PIN (iOS Keychain, Android Keystore)
 - [ ] Seed phrase generation and backup
 - [ ] Real token balance queries from blockchain
-- [ ] Multi-token support (DTFG, ETH, USDC)
+- [ ] Multi-token support (DTG, ETH, USDC)
 - [ ] Gas estimation and fee display
 - [ ] Transaction status polling
 - [ ] Blockchain explorer links
@@ -708,3 +708,4 @@ flutter test test/wallet_mvp_test.dart
 **Features**: ✅ 100% implemented
 **Tests**: ⚠️ 24 tests created (SharedPreferences mock needed for Phase 1)
 **Ready for Phase 1**: ✅ Yes (blockchain integration next)
+

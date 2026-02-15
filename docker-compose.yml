@@ -1,37 +1,61 @@
 version: "3.8"
 
+# =============================================================================
+# DTG Docker Compose - Infrastructure Services ONLY
+# =============================================================================
+# Backend and Admin run locally from repo, NOT in Docker.
+# This file provides: PostgreSQL, Redis, Biometric-service
+# =============================================================================
+
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: dtfg-postgres
+    container_name: dtg-postgres
     environment:
-      POSTGRES_DB: dtfg
-      POSTGRES_USER: dtfg_user
-      POSTGRES_PASSWORD: dtfg_dev_password
+      POSTGRES_DB: dtg
+      POSTGRES_USER: dtg_user
+      POSTGRES_PASSWORD: dtg_dev_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/migrations:/docker-entrypoint-initdb.d
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dtfg_user -d dtfg"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U dtg_user -d dtg"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: dtfg-redis
+    container_name: dtg-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  biometric-service:
+    build: ./biometric-service
+    container_name: dtg-biometric-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
 
 volumes:
   postgres_data:

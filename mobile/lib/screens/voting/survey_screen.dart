@@ -4,6 +4,7 @@ import '../../models/poll.dart';
 import '../../services/interfaces/i_api_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
+import 'vote_receipt_screen.dart';
 
 class SurveyScreen extends StatefulWidget {
   final Poll poll;
@@ -183,9 +184,10 @@ class _SurveyScreenState extends State<SurveyScreen> {
                 // Question text
                 Text(
                   _currentQuestion.questionText,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.3, // Better readability for wrapped questions
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -257,26 +259,9 @@ class _SurveyScreenState extends State<SurveyScreen> {
     return Column(
       children: _currentQuestion.options.map((option) {
         final isSelected = selectedId == option.id;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isSelected
-                  ? Theme.of(context).primaryColor
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: ListTile(
-            leading: Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
-            ),
-            title: Text(
-              option.optionText,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: InkWell(
             onTap: () {
               setState(() {
                 _responses[_currentQuestion.id] = QuestionResponseData(
@@ -285,6 +270,52 @@ class _SurveyScreenState extends State<SurveyScreen> {
                 );
               });
             },
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey.shade300,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      option.optionText,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        height: 1.4, // Good line height for long options
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
+                            : Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       }).toList(),
@@ -308,23 +339,13 @@ class _SurveyScreenState extends State<SurveyScreen> {
         const SizedBox(height: 8),
         ..._currentQuestion.options.map((option) {
           final isSelected = selectedIds.contains(option.id);
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: isSelected
-                    ? Theme.of(context).primaryColor
-                    : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: CheckboxListTile(
-              value: isSelected,
-              onChanged: (checked) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              onTap: () {
                 setState(() {
                   final newIds = List<String>.from(selectedIds);
-                  if (checked == true) {
+                  if (!isSelected) {
                     newIds.add(option.id);
                   } else {
                     newIds.remove(option.id);
@@ -335,12 +356,52 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   );
                 });
               },
-              title: Text(
-                option.optionText,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+              borderRadius: BorderRadius.circular(16),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isSelected
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      color: isSelected
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        option.optionText,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          height: 1.4, // Good line height for long options
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              activeColor: Theme.of(context).primaryColor,
-              controlAffinity: ListTileControlAffinity.leading,
             ),
           );
         }),
@@ -528,35 +589,58 @@ class _SurveyScreenState extends State<SurveyScreen> {
             final option = _currentQuestion.options.firstWhere(
               (o) => o.id == optionId,
             );
-            return Card(
-              margin: const EdgeInsets.only(bottom: 4),
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-              child: ListTile(
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Theme.of(context).primaryColor,
-                  child: Text(
-                    '#$rank',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).primaryColor.withValues(alpha: 0.3),
                   ),
                 ),
-                title: Text(option.optionText),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () {
-                    setState(() {
-                      final newIds = List<String>.from(rankedIds);
-                      newIds.remove(optionId);
-                      _responses[_currentQuestion.id] = QuestionResponseData(
-                        questionId: _currentQuestion.id,
-                        rankedOptionIds: newIds,
-                      );
-                    });
-                  },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Theme.of(context).primaryColor,
+                      child: Text(
+                        '$rank',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        option.optionText,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          final newIds = List<String>.from(rankedIds);
+                          newIds.remove(optionId);
+                          _responses[_currentQuestion.id] =
+                              QuestionResponseData(
+                                questionId: _currentQuestion.id,
+                                rankedOptionIds: newIds,
+                              );
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
             );
@@ -574,11 +658,9 @@ class _SurveyScreenState extends State<SurveyScreen> {
           ),
           const SizedBox(height: 8),
           ...unrankedOptions.map((option) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 4),
-              child: ListTile(
-                title: Text(option.optionText),
-                trailing: const Icon(Icons.add_circle_outline),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
                 onTap: () {
                   setState(() {
                     final newIds = List<String>.from(rankedIds);
@@ -589,6 +671,30 @@ class _SurveyScreenState extends State<SurveyScreen> {
                     );
                   });
                 },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          option.optionText,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.add_circle_outline,
+                        size: 20,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           }),
@@ -738,30 +844,58 @@ class _SurveyScreenState extends State<SurveyScreen> {
         responses: responsesList,
       );
 
-      // Save activity record (no response data stored)
-      await storageService.saveActivityItem(ActivityItem(
-        pollId: widget.poll.id,
-        title: widget.poll.title,
-        type: widget.poll.type,
-        votedAt: DateTime.now(),
-        endsAt: widget.poll.endAt,
-      ));
+      // Extract reward info from backend response (source of truth)
+      final reward = result['reward'];
+      String? rewardAmount;
+      String? rewardToken;
+      if (reward != null && reward['issued'] == true) {
+        rewardAmount = reward['amount']?.toString();
+        rewardToken = reward['tokenSymbol'] as String?;
+      }
+
+      // Save activity record with backend-confirmed reward info
+      await storageService.saveActivityItem(
+        ActivityItem(
+          pollId: widget.poll.id,
+          title: widget.poll.title,
+          type: widget.poll.type,
+          votedAt: DateTime.now(),
+          endsAt: widget.poll.endAt,
+          rewardAmount: rewardAmount,
+          rewardToken: rewardToken,
+        ),
+      );
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => SurveyReceiptScreen(
+            builder: (context) => VoteReceiptScreen(
               poll: widget.poll,
-              questionsAnswered: _responses.length,
-              totalQuestions: _questions.length,
-              txHash:
-                  result['txHash'] ??
-                  'mock_tx_${DateTime.now().millisecondsSinceEpoch}',
+              selectedOption: PollOption(
+                id: 'survey',
+                text: 'Survey Responses',
+                displayOrder: 0,
+              ),
+              txHash: result['txHash'] ?? 'mock_survey_tx',
             ),
           ),
         );
       }
     } catch (e) {
+      final errorStr = e.toString();
+      if (errorStr.contains('409') || errorStr.contains('Already')) {
+        // Self-healing: treat as success to allow dashboard refresh
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Survey already submitted. Refreshing...'),
+            ),
+          );
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+        return;
+      }
+
       setState(() => _submitting = false);
       if (mounted) {
         ScaffoldMessenger.of(

@@ -14,9 +14,9 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_DB: dtfg_test
-          POSTGRES_USER: dtfg_user
-          POSTGRES_PASSWORD: dtfg_test_password
+          POSTGRES_DB: DTG_test
+          POSTGRES_USER: DTG_user
+          POSTGRES_PASSWORD: DTG_test_password
         ports:
           - 5432:5432
         options: >-
@@ -60,7 +60,7 @@ jobs:
       - name: Run tests
         working-directory: ./backend
         env:
-          DATABASE_URL: postgresql://dtfg_user:dtfg_test_password@localhost:5432/dtfg_test
+          DATABASE_URL: postgresql://DTG_user:DTG_test_password@localhost:5432/DTG_test
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test_secret_key_for_ci
           NODE_ENV: test
@@ -69,6 +69,27 @@ jobs:
       - name: Build
         working-directory: ./backend
         run: npm run build
+
+  contract-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Validate OpenAPI contracts
+        working-directory: ./backend
+        run: npm run validate:contracts
 
   admin-build:
     runs-on: ubuntu-latest
@@ -98,3 +119,4 @@ jobs:
       - name: Build
         working-directory: ./admin
         run: npm run build
+

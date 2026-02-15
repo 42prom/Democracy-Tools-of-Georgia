@@ -119,7 +119,7 @@ describe('CreatePoll Component', () => {
           expect.objectContaining({
             rewards_enabled: true,
             reward_amount: 10.50,
-            reward_token: 'DTFG',
+            reward_token: 'DTG',
           })
         );
       });
@@ -269,7 +269,7 @@ describe('CreatePoll Component', () => {
             title: 'Rewarded Poll',
             rewards_enabled: true,
             reward_amount: 25.00,
-            reward_token: 'DTFG',
+            reward_token: 'DTG',
           })
         );
         expect(adminPollsApi.publish).toHaveBeenCalledWith('poll-published-123');
@@ -352,8 +352,9 @@ describe('CreatePoll Component', () => {
       // Reward preview should be visible
       await waitFor(() => {
         expect(screen.getByText(/reward per vote/i)).toBeInTheDocument();
-        expect(screen.getByText(/5.00 DTFG/i)).toBeInTheDocument();
+        expect(screen.getByText(/5.00 DTG/i)).toBeInTheDocument();
       });
     });
   });
 });
+

@@ -7,6 +7,9 @@ class Poll {
   final List<SurveyQuestion>? questions; // For survey type
   final List<String> tags;
   final String? endAt;
+  final bool rewardsEnabled;
+  final double? rewardAmount;
+  final String? rewardToken;
 
   Poll({
     required this.id,
@@ -17,6 +20,9 @@ class Poll {
     this.questions,
     required this.tags,
     this.endAt,
+    this.rewardsEnabled = false,
+    this.rewardAmount,
+    this.rewardToken,
   });
 
   bool get isSurvey => type == 'survey' && questions != null && questions!.isNotEmpty;
@@ -40,6 +46,13 @@ class Poll {
       questions: questions,
       tags: List<String>.from(json['tags'] ?? []),
       endAt: json['end_at'],
+      rewardsEnabled: json['rewards_enabled'] ?? false,
+      rewardAmount: json['reward_amount'] != null
+          ? (json['reward_amount'] is String
+              ? double.tryParse(json['reward_amount'])
+              : (json['reward_amount'] as num).toDouble())
+          : null,
+      rewardToken: json['reward_token'] ?? 'DTG',
     );
   }
 }
@@ -59,7 +72,9 @@ class PollOption {
     return PollOption(
       id: json['id'],
       text: json['text'],
-      displayOrder: json['display_order'] ?? 0,
+      displayOrder: json['display_order'] is String
+          ? int.tryParse(json['display_order']) ?? 0
+          : json['display_order'] ?? 0,
     );
   }
 }
@@ -84,12 +99,15 @@ class SurveyQuestion {
   });
 
   factory SurveyQuestion.fromJson(Map<String, dynamic> json) {
+    final displayOrderValue = json['displayOrder'] ?? json['display_order'] ?? 0;
     return SurveyQuestion(
       id: json['id'],
       questionText: json['questionText'] ?? json['question_text'],
       questionType: json['questionType'] ?? json['question_type'],
       required: json['required'] ?? true,
-      displayOrder: json['displayOrder'] ?? json['display_order'] ?? 0,
+      displayOrder: displayOrderValue is String
+          ? int.tryParse(displayOrderValue) ?? 0
+          : displayOrderValue,
       config: Map<String, dynamic>.from(json['config'] ?? {}),
       options: (json['options'] as List? ?? [])
           .map((opt) => QuestionOption.fromJson(opt))
@@ -110,10 +128,13 @@ class QuestionOption {
   });
 
   factory QuestionOption.fromJson(Map<String, dynamic> json) {
+    final displayOrderValue = json['displayOrder'] ?? json['display_order'] ?? 0;
     return QuestionOption(
       id: json['id'],
       optionText: json['optionText'] ?? json['option_text'],
-      displayOrder: json['displayOrder'] ?? json['display_order'] ?? 0,
+      displayOrder: displayOrderValue is String
+          ? int.tryParse(displayOrderValue) ?? 0
+          : displayOrderValue,
     );
   }
 }

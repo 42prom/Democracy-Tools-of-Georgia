@@ -36,7 +36,7 @@ class Transaction {
         orElse: () => TransactionStatus.pending,
       ),
       amount: json['amount'],
-      token: json['token'] ?? 'DTFG',
+      token: json['token'] ?? 'DTG',
       address: json['address'],
       timestamp: DateTime.parse(json['timestamp']),
       txHash: json['txHash'],
@@ -58,3 +58,4 @@ class Transaction {
     };
   }
 }
+

@@ -1,13 +1,12 @@
 import { Pool, PoolClient } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { getDatabaseUrl } from '../config/secrets';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: getDatabaseUrl(),
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  statement_timeout: 10000, // 10 seconds max query time
 });
 
 // Handle pool errors
@@ -67,6 +66,7 @@ export async function transaction<T>(
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
+    console.error('Database transaction error:', error);
     throw error;
   } finally {
     client.release();

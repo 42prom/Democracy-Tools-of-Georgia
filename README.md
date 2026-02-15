@@ -1,228 +1,231 @@
-# DTFG - Democratic Tools for Georgia
+# DTG - Digital Transparency in Governance
 
-Privacy-preserving voting system with NFC passport verification and k-anonymity guarantees.
-
-## Phase 0 Status
-
-**Current Phase**: Foundation (Mock Authentication)
-
-- ✅ Core infrastructure setup
-- ✅ Database schema
-- ✅ Mock enrollment API
-- ⏳ Admin panel shell
-- ❌ Real NFC/Liveness (Phase 1)
-- ❌ Blockchain integration (Phase 2)
+A secure, privacy-preserving digital voting and civic engagement platform.
 
 ## Architecture
 
-- **Backend**: Node.js + TypeScript + Express + PostgreSQL + Redis
-- **Admin Panel**: React + TypeScript + Vite
-- **Database**: PostgreSQL 15+
-- **Cache**: Redis 7+
+```
++------------------+     +------------------+     +------------------+
+|  Mobile App      |     |  Admin Panel     |     |  Backend API     |
+|  (Flutter)       |     |  (React/Vite)    |     |  (Node/Express)  |
+|  Port: N/A       |     |  Port: 5173      |     |  Port: 3000      |
++--------+---------+     +--------+---------+     +--------+---------+
+         |                        |                        |
+         |                        |                        |
+         +------------------------+------------------------+
+                                  |
+                    +-------------+-------------+
+                    |                           |
+          +---------v---------+       +---------v---------+
+          |  Docker Services  |       |  Docker Services  |
+          |                   |       |                   |
+          |  PostgreSQL:5432  |       |  Redis:6379       |
+          |  Biometric:8000   |       |                   |
+          +-------------------+       +-------------------+
+```
 
 ## Prerequisites
 
-- Node.js 18+
 - Docker & Docker Compose
-- npm or pnpm
+- Node.js 18+ (for backend and admin)
+- Flutter 3.x (for mobile app)
 
 ## Quick Start
 
-### 1. Clone and Install
+### 1. Start Docker Services
 
 ```bash
-git clone <repository-url>
-cd antygravity
+# Start PostgreSQL, Redis, and Biometric service
+docker compose up -d
+
+# Verify all services are healthy
+docker compose ps
+```
+
+Expected output:
+```
+NAME                  STATUS
+dtg-postgres          running (healthy)
+dtg-redis             running (healthy)
+dtg-biometric-service running (healthy)
+```
+
+### 2. Configure Environment
+
+```bash
+# Copy example environment file
 cp .env.example .env
+
+# Edit .env if needed (defaults work for local development)
 ```
 
-### 2. Start Infrastructure
+### 3. Run Backend
 
 ```bash
-# Start PostgreSQL and Redis
-docker-compose up -d
-
-# Wait for health checks
-docker-compose ps
-```
-
-### 3. Install Dependencies
-
-```bash
-# Backend
 cd backend
 npm install
-
-# Admin panel
-cd ../admin
-npm install
+npm run dev
 ```
 
-### 4. Run Migrations
+Backend will be available at `http://localhost:3000`
 
+### 4. Run Admin Panel
+
+```bash
+cd admin
+npm install
+npm run dev
+```
+
+Admin panel will be available at `http://localhost:5173`
+
+### 5. Run Mobile App (Optional)
+
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+## Environment Variables
+
+### Required (already set in .env)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://dtg_user:dtg_dev_password@localhost:5432/dtg` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `BIOMETRIC_SERVICE_URL` | Biometric microservice URL | `http://localhost:8000` |
+| `JWT_SECRET` | JWT signing secret (min 32 chars) | Dev default |
+| `PN_HASH_SECRET` | Personal number hashing secret | Dev default |
+| `API_KEY_ENCRYPTION_SECRET` | API key encryption (min 32 chars) | Dev default |
+| `DEVICE_HASH_SECRET` | Device ID hashing secret | Dev default |
+| `VOTER_HASH_SECRET` | Voter identity hashing secret | Dev default |
+
+### Optional
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CORS_ORIGIN` | Allowed CORS origins | `http://localhost:5173` |
+| `MIN_K_ANONYMITY` | Minimum votes for k-anonymity | `30` |
+| `BIOMETRIC_TIMEOUT_MS` | Biometric service timeout | `15000` |
+| `LOG_LEVEL` | Logging level | `info` |
+
+## Database Migrations
+
+Migrations run automatically when PostgreSQL container starts (via `/docker-entrypoint-initdb.d`).
+
+To run migrations manually:
 ```bash
 cd backend
 npm run migrate
 ```
 
-### 5. Start Development Servers
+## Admin Settings
 
-```bash
-# Terminal 1: Backend API
-cd backend
-npm run dev
+The admin panel provides 5 settings categories:
 
-# Terminal 2: Admin Panel
-cd admin
-npm run dev
-```
+1. **Blockchain** - Rewards, NFT payouts, RPC configuration
+2. **Regions** - Geographic region management
+3. **Verification Providers** - NFC, document scanning, liveness, face matching
+4. **Security Policies** - Device policies, VPN detection, rate limiting
+5. **Notifications** - Push notification configuration
 
-Backend API: http://localhost:3000
-Admin Panel: http://localhost:5173
-
-## Project Structure
-
-```
-/
-├── api/                  # OpenAPI specification
-│   └── openapi_v1.yaml
-├── architecture/         # Architecture diagrams
-├── backend/             # Node.js API
-│   ├── src/
-│   │   ├── routes/      # API endpoints
-│   │   ├── services/    # Business logic
-│   │   ├── middleware/  # Express middleware
-│   │   └── db/          # Database clients
-│   └── tests/           # Jest tests
-├── admin/               # React admin panel
-│   └── src/
-│       ├── pages/       # UI pages
-│       └── components/  # Reusable components
-├── db/                  # Database
-│   ├── schema.sql       # Canonical schema
-│   └── migrations/      # Migration scripts
-└── docs/                # Documentation
-    ├── dtfg_system_spec.md
-    └── roadmap.md
-```
+Access at: `http://localhost:5173/settings`
 
 ## API Endpoints
 
-### Public Endpoints
+### Health Check
+```
+GET /api/v1/health
+```
 
-- `GET /health` - Health check
-- `POST /api/v1/auth/challenge` - Get nonce
-- `POST /api/v1/auth/enroll` - Enroll (mock)
-- `GET /api/v1/polls` - List eligible polls
-- `POST /api/v1/polls/{id}/vote` - Submit vote
-- `GET /api/v1/stats/polls/{id}` - Get results
+### Admin Authentication
+```
+POST /api/v1/admin/auth/login
+Body: { "email": "...", "password": "..." }
+```
 
-### Admin Endpoints (Mock Auth)
+### Admin Settings
+```
+GET  /api/v1/admin/settings
+PATCH /api/v1/admin/settings
+```
 
-- `POST /api/v1/admin/polls` - Create poll
-- `POST /api/v1/admin/polls/estimate` - Estimate audience
-- `PATCH /api/v1/admin/polls/{id}/publish` - Publish poll
+## Docker Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| postgres | 5432 | PostgreSQL 15 database |
+| redis | 6379 | Redis 7 cache/session store |
+| biometric-service | 8000 | Python FastAPI face verification |
+
+### Biometric Service Endpoints
+
+```
+GET  /health              - Health check
+POST /verify              - Face verification (two images)
+POST /verify-normalized   - Extended verification with quality metadata
+```
 
 ## Development
 
-### Run Tests
+### Running Tests
 
 ```bash
+# Backend tests
 cd backend
+npm test
+
+# Admin tests
+cd admin
 npm test
 ```
 
-### Run Linting
+### Cleanup Debug Files
 
 ```bash
-npm run lint
-```
-
-### Database Migrations
-
-```bash
-npm run migrate        # Run pending migrations
-npm run migrate:down   # Rollback last migration
-```
-
-## Security Constraints
-
-**Non-Negotiable Privacy Rules:**
-
-1. ❌ NO biometric storage (passport images, selfies, chip portraits)
-2. ❌ NO PII in database or admin views
-3. ✅ Nullifier-based double-vote prevention
-4. ✅ Single-use nonces with 60s TTL
-5. ✅ K-anonymity (k≥30) enforced at publish & query time
-
-## Mock Authentication (Phase 0)
-
-For development, the enrollment endpoint accepts any `deviceKey` and returns a mock credential with random demographics.
-
-**Admin Login:**
-- Email: `admin@dtfg.ge`
-- Password: `phase0password`
-
-## Testing Vote Flow
-
-```bash
-# 1. Get challenge nonce
-curl -X POST http://localhost:3000/api/v1/auth/challenge \
-  -H "Content-Type: application/json" \
-  -d '{"deviceId": "test_device_001"}'
-
-# 2. Enroll (mock)
-curl -X POST http://localhost:3000/api/v1/auth/enroll \
-  -H "Content-Type: application/json" \
-  -d '{"proof": "mock", "deviceKey": "test_key_001"}'
-
-# 3. List polls (use JWT from step 2)
-curl http://localhost:3000/api/v1/polls \
-  -H "Authorization: Bearer <jwt_token>"
-
-# 4. Vote
-curl -X POST http://localhost:3000/api/v1/polls/{poll_id}/vote \
-  -H "Authorization: Bearer <jwt_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pollId": "uuid",
-    "optionId": "uuid",
-    "nullifier": "sha256_hash",
-    "nonce": "nonce_from_challenge",
-    "signature": "mock_sig"
-  }'
+./scripts/cleanup-redundant-files.sh
 ```
 
 ## Troubleshooting
 
-### Database connection failed
+### Docker Services Not Starting
 
 ```bash
-# Check containers are running
-docker-compose ps
+# Check logs
+docker compose logs postgres
+docker compose logs redis
+docker compose logs biometric-service
 
-# View logs
-docker-compose logs postgres
+# Restart services
+docker compose down
+docker compose up -d
 ```
 
-### Redis connection failed
+### Database Connection Failed
 
-```bash
-# Test Redis connection
-docker exec -it dtfg-redis redis-cli ping
-```
+1. Verify PostgreSQL is running: `docker compose ps`
+2. Check DATABASE_URL matches docker-compose.yml credentials
+3. Ensure port 5432 is not in use by another process
 
-### Port conflicts
+### Biometric Service Errors
 
-Edit `docker-compose.yml` to change port mappings if 5432 or 6379 are in use.
+1. First startup downloads ML models (~500MB) - may take a few minutes
+2. Check logs: `docker compose logs biometric-service`
+3. Verify port 8000 is accessible: `curl http://localhost:8000/health`
 
-## Documentation
+## Production Deployment
 
-- [System Specification](docs/dtfg_system_spec.md)
-- [Roadmap](docs/roadmap.md)
-- [OpenAPI Spec](api/openapi_v1.yaml)
-- [Implementation Checklist](IMPLEMENTATION_CHECKLIST.md)
+**IMPORTANT:** Before deploying to production:
+
+1. Generate secure random values for all `*_SECRET` variables
+2. Set `NODE_ENV=production`
+3. Configure proper `CORS_ORIGIN`
+4. Set `MIN_K_ANONYMITY=30` or higher
+5. Use proper SSL/TLS certificates
+6. Review and harden security policies
 
 ## License
 
-Proprietary - Democratic Tools for Georgia
+Proprietary - All rights reserved.

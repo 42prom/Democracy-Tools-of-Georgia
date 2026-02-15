@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Eye, Search, X } from 'lucide-react';
+import { BarChart3, Eye, Search, X, FileSpreadsheet } from 'lucide-react';
 import Card from '../components/ui/Card';
 import ReferendumResults from '../components/ReferendumResults';
+import AuditExportModal from '../components/AuditExportModal';
 import { adminPollsApi, analyticsApi } from '../api/client';
 import type { Poll, PollResults } from '../types';
 
@@ -14,6 +15,7 @@ export default function VotingHistory() {
   const [loading, setLoading] = useState(true);
   const [selectedPoll, setSelectedPoll] = useState<HistoricalPoll | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [exportModalPoll, setExportModalPoll] = useState<HistoricalPoll | null>(null);
 
   const filteredPolls = useMemo(() => {
     if (!searchQuery.trim()) return polls;
@@ -145,9 +147,22 @@ export default function VotingHistory() {
                       : 0}{' '}
                     votes
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    Closed
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExportModalPoll(poll);
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                      title="Export Audit Data"
+                    >
+                      <FileSpreadsheet className="w-3 h-3" />
+                      Export
+                    </button>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                      Closed
+                    </span>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -157,13 +172,22 @@ export default function VotingHistory() {
           <div className="lg:col-span-2">
             {selectedPoll ? (
               <Card>
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {selectedPoll.title}
-                  </h2>
-                  {selectedPoll.description && (
-                    <p className="text-gray-600 mt-2">{selectedPoll.description}</p>
-                  )}
+                <div className="mb-6 flex items-start justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {selectedPoll.title}
+                    </h2>
+                    {selectedPoll.description && (
+                      <p className="text-gray-600 mt-2">{selectedPoll.description}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setExportModalPoll(selectedPoll)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Export for Audit
+                  </button>
                 </div>
 
                 {selectedPoll.results ? (
@@ -294,6 +318,14 @@ export default function VotingHistory() {
           </div>
         </div>
       )}
+
+      {/* Audit Export Modal */}
+      <AuditExportModal
+        pollId={exportModalPoll?.id || ''}
+        pollTitle={exportModalPoll?.title || ''}
+        isOpen={!!exportModalPoll}
+        onClose={() => setExportModalPoll(null)}
+      />
     </div>
   );
 }

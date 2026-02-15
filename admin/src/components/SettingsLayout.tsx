@@ -1,11 +1,13 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { MapPin, Shield, Coins } from 'lucide-react';
+import { MapPin, Shield, Coins, ShieldCheck, Bell } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const settingsTabs = [
   { path: '/settings/blockchain', label: 'Blockchain', icon: Coins },
   { path: '/settings/regions', label: 'Regions', icon: MapPin },
   { path: '/settings/verification-providers', label: 'Verification Providers', icon: Shield },
+  { path: '/settings/security', label: 'Security Policies', icon: ShieldCheck },
+  { path: '/settings/notifications', label: 'Notifications', icon: Bell },
 ];
 
 export default function SettingsLayout() {

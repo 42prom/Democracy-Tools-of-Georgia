@@ -108,7 +108,7 @@ export default function DraftedPolls() {
                     </span>
                     {poll.rewards_enabled && poll.reward_amount && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        🎁 {poll.reward_amount} {poll.reward_token || 'DTFG'}
+                        🎁 {poll.reward_amount} {poll.reward_token || 'DTG'}
                       </span>
                     )}
                     <span className="text-sm text-gray-500">
@@ -148,3 +148,4 @@ export default function DraftedPolls() {
     </div>
   );
 }
+

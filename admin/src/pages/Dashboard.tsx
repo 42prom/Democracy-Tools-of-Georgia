@@ -32,7 +32,7 @@ export default function Dashboard() {
       // Calculate stats
       const active = allPolls.filter(p => p.status === 'active').length;
       const draft = allPolls.filter(p => p.status === 'draft').length;
-      const ended = allPolls.filter(p => p.status === 'closed').length;
+      const ended = allPolls.filter(p => p.status === 'ended').length;
 
       setStats({
         active,

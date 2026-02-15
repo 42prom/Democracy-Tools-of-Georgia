@@ -1,6 +1,14 @@
 import { query } from '../db/client';
+import { AppConfig } from '../config/app';
 
-const MIN_K_ANONYMITY = parseInt(process.env.MIN_K_ANONYMITY || '30', 10);
+// Production-safe k-anonymity floor: cannot be bypassed via env in non-development
+const PRODUCTION_SAFE_MIN_K = 5;
+const ENV_MIN_K = AppConfig.MIN_K_ANONYMITY;
+
+// In production, enforce minimum of PRODUCTION_SAFE_MIN_K even if env says 0
+const MIN_K_ANONYMITY = AppConfig.NODE_ENV === 'development'
+  ? ENV_MIN_K
+  : Math.max(ENV_MIN_K, PRODUCTION_SAFE_MIN_K);
 
 interface PollResults {
   totalVotes: number;
@@ -10,6 +18,7 @@ interface PollResults {
     count: number;
   }>;
   suppressed?: boolean;
+  pollEnded?: boolean;
 }
 
 interface GroupedPollResults {
@@ -19,6 +28,7 @@ interface GroupedPollResults {
     optionText: string;
     breakdowns: Record<string, number | string>;
   }>;
+  pollEnded?: boolean;
 }
 
 /**
@@ -28,6 +38,24 @@ export async function getPollResults(
   pollId: string,
   groupBy?: 'region' | 'age_bucket' | 'gender'
 ): Promise<PollResults | GroupedPollResults> {
+  // Get poll config (including min_k_anonymity, end_at, and status)
+  const pollConfigResult = await query('SELECT type, min_k_anonymity, end_at, status FROM polls WHERE id = $1', [pollId]);
+  if (pollConfigResult.rows.length === 0) {
+    throw new Error('Poll not found');
+  }
+  const poll = pollConfigResult.rows[0];
+  const pollType = poll.type;
+  // Poll is ended if: status is 'ended' OR end_at has passed
+  const pollEnded = poll.status === 'ended' ||
+    (poll.end_at && new Date(poll.end_at) < new Date());
+
+  // Use poll-specific threshold, fall back to global MIN_K_ANONYMITY
+  // In production, always enforce at least PRODUCTION_SAFE_MIN_K
+  const rawThreshold = poll.min_k_anonymity || MIN_K_ANONYMITY;
+  const pollKThreshold = AppConfig.NODE_ENV === 'development'
+    ? rawThreshold
+    : Math.max(rawThreshold, PRODUCTION_SAFE_MIN_K);
+
   // Get total votes
   const totalResult = await query(
     'SELECT COUNT(*) as count FROM votes WHERE poll_id = $1',
@@ -35,8 +63,52 @@ export async function getPollResults(
   );
   const totalVotes = parseInt(totalResult.rows[0].count, 10);
 
+  // K-anonymity check: Only suppress details for LIVE polls
+  // Once a poll has ended, results should be visible regardless of vote count
+  if (!pollEnded && totalVotes < pollKThreshold) {
+    return {
+      totalVotes: totalVotes,
+      results: [],
+      suppressed: true,
+      pollEnded: false
+    };
+  }
+
   if (!groupBy) {
-    // Simple aggregation
+    if (pollType === 'survey') {
+      // For surveys, we aggregate responses from survey_responses
+      const resultsQuery = await query(
+        `SELECT
+          po.id as option_id,
+          po.text as option_text,
+          po.display_order,
+          (SELECT COUNT(*) FROM survey_responses sr 
+           JOIN survey_questions sq ON sr.question_id = sq.id
+           WHERE sr.poll_id = $1 AND sq.display_order = po.display_order) as count
+         FROM poll_options po
+         WHERE po.poll_id = $1
+         ORDER BY po.display_order`,
+        [pollId]
+      );
+
+      const totalResponsesResult = await query(
+        'SELECT COUNT(DISTINCT nullifier_hash) as count FROM survey_nullifiers WHERE poll_id = $1',
+        [pollId]
+      );
+      const totalResponses = parseInt(totalResponsesResult.rows[0].count, 10);
+
+      return {
+        totalVotes: totalResponses,
+        results: resultsQuery.rows.map(row => ({
+          optionId: row.option_id,
+          optionText: row.option_text,
+          count: parseInt(row.count, 10),
+        })),
+        pollEnded,
+      };
+    }
+
+    // Standard aggregation (election/referendum)
     const resultsQuery = await query(
       `SELECT
         v.option_id,
@@ -58,6 +130,7 @@ export async function getPollResults(
         optionText: row.option_text,
         count: parseInt(row.count, 10),
       })),
+      pollEnded,
     };
   } else {
     // Grouped aggregation with k-anonymity enforcement
@@ -93,20 +166,11 @@ export async function getPollResults(
         };
       }
 
-      // Apply k-anonymity: suppress cohorts below threshold
-      if (count < MIN_K_ANONYMITY) {
+      // Apply k-anonymity: suppress cohorts below threshold (only for live polls)
+      if (!pollEnded && count < pollKThreshold) {
         optionsMap[optionId].breakdowns['<suppressed>'] = '<k_threshold_not_met>';
       } else {
         optionsMap[optionId].breakdowns[groupValue] = count;
-      }
-    }
-
-    // Count suppressed cells
-    let suppressedCells = 0;
-    for (const row of resultsQuery.rows) {
-      const count = parseInt(row.count, 10);
-      if (count < MIN_K_ANONYMITY) {
-        suppressedCells++;
       }
     }
 
@@ -117,6 +181,7 @@ export async function getPollResults(
         optionText: data.optionText,
         breakdowns: data.breakdowns,
       })),
+      pollEnded,
     };
   }
 }

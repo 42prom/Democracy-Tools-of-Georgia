@@ -1,4 +1,4 @@
-# DTFG Roadmap: MVP to Production
+# DTG Roadmap: MVP to Production
 
 ## Phase 0: Foundation (Weeks 1-4)
 
@@ -69,3 +69,4 @@
 
 - Full system production release.
 - External Security Audit passed.
+

@@ -49,6 +49,7 @@
 ## Screen 4: Wallet
 
 - **Components**:
-  - Balance Card: "0.00 DTFG".
+  - Balance Card: "0.00 DTG".
   - Actions: [ Send ] [ Receive ] [ Scan ].
   - History List.
+

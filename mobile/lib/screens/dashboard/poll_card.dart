@@ -6,8 +6,9 @@ import '../voting/referendum_screen.dart';
 
 class PollCard extends StatelessWidget {
   final Poll poll;
+  final VoidCallback? onVoteComplete;
 
-  const PollCard({super.key, required this.poll});
+  const PollCard({super.key, required this.poll, this.onVoteComplete});
 
   @override
   Widget build(BuildContext context) {
@@ -22,25 +23,30 @@ class PollCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: poll.type == 'referendum'
                         ? Colors.purple.withValues(alpha: 0.15)
                         : poll.isSurvey
-                            ? Colors.blue.withValues(alpha: 0.15)
-                            : Colors.green.withValues(alpha: 0.15),
+                        ? Colors.blue.withValues(alpha: 0.15)
+                        : Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    poll.type[0].toUpperCase() + poll.type.substring(1),
+                    poll.type.isEmpty
+                        ? ''
+                        : poll.type[0].toUpperCase() + poll.type.substring(1),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: poll.type == 'referendum'
                           ? Colors.purple
                           : poll.isSurvey
-                              ? Colors.blue
-                              : Colors.green,
+                          ? Colors.blue
+                          : Colors.green,
                     ),
                   ),
                 ),
@@ -49,9 +55,10 @@ class PollCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               poll.title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                height: 1.25, // Better readability for wrapped titles
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -74,7 +81,7 @@ class PollCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   Widget screen;
                   if (poll.isSurvey) {
                     screen = SurveyScreen(poll: poll);
@@ -83,16 +90,17 @@ class PollCard extends StatelessWidget {
                   } else {
                     screen = PollDetailsScreen(poll: poll);
                   }
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => screen),
-                  );
+                  await Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (context) => screen));
+                  onVoteComplete?.call();
                 },
                 child: Text(
                   poll.isSurvey
                       ? 'Take Survey'
                       : poll.type == 'referendum'
-                          ? 'Vote on Referendum'
-                          : 'Vote Now',
+                      ? 'Vote on Referendum'
+                      : 'Vote Now',
                 ),
               ),
             ),

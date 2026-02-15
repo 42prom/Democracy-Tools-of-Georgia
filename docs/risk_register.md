@@ -1,4 +1,4 @@
-# DTFG Risk Register
+# DTG Risk Register
 
 | ID       | Risk                                 | Severity | Likelihood | Mitigation Strategy                                                                                            | Owner      |
 | :------- | :----------------------------------- | :------- | :--------- | :------------------------------------------------------------------------------------------------------------- | :--------- |
@@ -10,3 +10,4 @@
 | **R-06** | **Wallet Gas Drain**                 | Medium   | Medium     | Paymaster Gating (Vote-Proof required). Strict daily caps.                                                     | Blockchain |
 | **R-07** | **Device Theft**                     | Medium   | Low        | Requires Device PIN/Bio to access KeyStore.                                                                    | OS         |
 | **R-08** | **Service Downtime on Election Day** | High     | Medium     | CDN caching for static assets. Read-Replicas for Poll Config. Queue-based ingestion for Votes.                 | DevOps     |
+

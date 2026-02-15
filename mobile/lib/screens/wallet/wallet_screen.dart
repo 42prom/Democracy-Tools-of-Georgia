@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../services/wallet_service.dart';
+import '../../services/localization_service.dart';
 import '../../models/transaction.dart';
 import 'send_screen.dart';
 import 'receive_screen.dart';
@@ -30,6 +32,7 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() => _isLoading = true);
 
     try {
+      await _walletService.syncWithBackend();
       final address = await _walletService.getWalletAddress();
       final balance = await _walletService.getBalance();
       final transactions = await _walletService.getTransactions();
@@ -63,6 +66,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locService = Provider.of<LocalizationService>(context);
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -83,24 +88,25 @@ class _WalletScreenState extends State<WalletScreen> {
                   child: Column(
                     children: [
                       Text(
-                        'Balance',
+                        locService.translate('balance'),
                         style: Theme.of(
                           context,
                         ).textTheme.titleMedium?.copyWith(color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '$_balance DTFG',
+                        '$_balance DTG',
                         style: Theme.of(context).textTheme.headlineLarge
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '≈ \$0.00 USD',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                      ),
+                      // Fiat conversion disabled
+                      // Text(
+                      //   '≈ \$0.00 USD',
+                      //   style: Theme.of(
+                      //     context,
+                      //   ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                      // ),
                     ],
                   ),
                 ),
@@ -113,7 +119,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   Expanded(
                     child: _buildActionButton(
                       icon: Icons.arrow_upward,
-                      label: 'Send',
+                      label: locService.translate('send'),
                       onPressed: _handleSend,
                     ),
                   ),
@@ -121,7 +127,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   Expanded(
                     child: _buildActionButton(
                       icon: Icons.arrow_downward,
-                      label: 'Receive',
+                      label: locService.translate('receive'),
                       onPressed: _handleReceive,
                     ),
                   ),
@@ -134,7 +140,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Transaction History',
+                    locService.translate('transaction_history'),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -164,7 +170,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No transactions yet',
+                          locService.translate('no_transactions'),
                           style: Theme.of(
                             context,
                           ).textTheme.titleMedium?.copyWith(color: Colors.grey),
@@ -199,7 +205,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildTransactionTile(Transaction tx) {
-    final dateFormat = DateFormat('MMM dd, HH:mm');
+    final dateFormat = DateFormat('dd-MM-yyyy, HH:mm');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -227,7 +233,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ),
         subtitle: Text(
-          '${tx.type == TransactionType.send ? 'To' : 'From'}: ${tx.address.substring(0, 10)}...\n${dateFormat.format(tx.timestamp)}',
+          '${tx.type == TransactionType.send ? 'To' : 'From'}: ${tx.address.length > 10 ? "${tx.address.substring(0, 10)}..." : tx.address}\n${dateFormat.format(tx.timestamp)}',
         ),
         trailing: _buildStatusBadge(tx.status),
         onTap: () {

@@ -2,7 +2,7 @@
 
 ## What Was Built
 
-A complete React + TypeScript admin panel for DTFG (Democratic Tools for Georgia) following [docs/ui_admin_spec.md](../docs/ui_admin_spec.md) exactly.
+A complete React + TypeScript admin panel for DTG (Democracy Tools Of Georgia) following [docs/ui_admin_spec.md](../docs/ui_admin_spec.md) exactly.
 
 ---
 
@@ -193,7 +193,7 @@ Navigation items:
 **User Profile** (bottom):
 - Avatar circle with "A" initial
 - Admin User
-- admin@dtfg.ge
+- admin@DTG.ge
 
 ---
 
@@ -438,3 +438,4 @@ Output: `admin/dist/` (static files ready to deploy)
 **Pages Implemented**: 7/7 (Dashboard, Create Poll, Drafts, Active, History, Settings/Regions, Logs)
 
 **UI Spec Compliance**: 100% (all specified components implemented)
+

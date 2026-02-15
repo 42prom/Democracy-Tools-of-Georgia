@@ -5,18 +5,15 @@ const router = Router();
 
 /**
  * GET /api/v1/settings/verification
- * Public read-only verification policy (no secrets)
+ * Public endpoint for mobile app to fetch verification policy
  */
-router.get(
-  '/verification',
-  async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      const settings = await getVerificationSettingsPublic();
-      res.json(settings);
-    } catch (error) {
-      next(error);
-    }
+router.get('/verification', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const settings = await getVerificationSettingsPublic();
+    res.json(settings);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export default router;

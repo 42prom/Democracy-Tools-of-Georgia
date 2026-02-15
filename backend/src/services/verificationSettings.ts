@@ -1,9 +1,9 @@
 import { pool } from '../db/client';
 
-export type NfcProvider = 'mock' | 'on_device_georgia';
-export type DocumentScannerProvider = 'manual' | 'on_device_ocr_mrz';
-export type LivenessProvider = 'mock' | 'provider' | 'in_house';
-export type FaceMatchProvider = 'mock' | 'provider' | 'in_house';
+export type NfcProvider = 'mock' | 'on_device_georgia' | 'provider';
+export type DocumentScannerProvider = 'manual' | 'nfc' | 'ocr';
+export type LivenessProvider = '3d_face_detector' | 'facetec' | 'iproov' | 'onfido' | 'aws-rekognition' | 'faceplusplus' | 'doublescript' | 'provider';
+export type FaceMatchProvider = 'custom_biometric_matcher' | 'aws-rekognition' | 'azure-face' | 'face-plusplus' | 'doublescript' | 'provider';
 export type FieldStrictness = 'strict' | 'lenient';
 
 export interface VerificationSettings {
@@ -12,6 +12,7 @@ export interface VerificationSettings {
     requireNfc: boolean;
     requireGeorgianCitizen: boolean;
     requirePersonalNumber: boolean;
+    allowSkipDocumentWhenNfcHasPortrait: boolean;
   };
   documentScanner: {
     provider: DocumentScannerProvider;
@@ -20,8 +21,8 @@ export interface VerificationSettings {
   };
   liveness: {
     provider: LivenessProvider;
-    minThreshold: number;
     retryLimit: number;
+    // Note: Liveness is pass/fail only - no threshold needed
   };
   faceMatch: {
     provider: FaceMatchProvider;
@@ -37,23 +38,24 @@ export interface VerificationSettingsPublic extends VerificationSettings {
 
 const DEFAULTS: VerificationSettings = {
   nfc: {
-    provider: 'mock',
+    provider: 'on_device_georgia',
     requireNfc: true,
     requireGeorgianCitizen: true,
     requirePersonalNumber: true,
+    allowSkipDocumentWhenNfcHasPortrait: true,
   },
   documentScanner: {
-    provider: 'manual',
+    provider: 'ocr',
     requireDocumentPhotoScan: true,
     strictness: 'strict',
   },
   liveness: {
-    provider: 'mock',
-    minThreshold: 0.7,
+    provider: '3d_face_detector',
     retryLimit: 3,
+    // Note: Liveness is pass/fail only - no threshold needed
   },
   faceMatch: {
-    provider: 'mock',
+    provider: 'custom_biometric_matcher',
     minThreshold: 0.75,
   },
 };
@@ -101,6 +103,10 @@ export async function getVerificationSettings(): Promise<VerificationSettings> {
         settings['verification_nfc_require_personal_number'],
         DEFAULTS.nfc.requirePersonalNumber
       ),
+      allowSkipDocumentWhenNfcHasPortrait: parseBool(
+        settings['verification_nfc_allow_skip_document'],
+        DEFAULTS.nfc.allowSkipDocumentWhenNfcHasPortrait
+      ),
     },
     documentScanner: {
       provider: docProvider,
@@ -112,7 +118,6 @@ export async function getVerificationSettings(): Promise<VerificationSettings> {
     },
     liveness: {
       provider: livenessProvider,
-      minThreshold: parseNumber(settings['verification_liveness_min_score'], DEFAULTS.liveness.minThreshold),
       retryLimit: Math.max(
         1,
         Math.floor(parseNumber(settings['verification_liveness_retry_limit'], DEFAULTS.liveness.retryLimit))

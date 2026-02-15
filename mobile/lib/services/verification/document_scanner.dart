@@ -51,7 +51,8 @@ class ManualPnEntryScanner implements DocumentScanner {
     if (input.manualEntry) {
       throw VerificationException(
         type: VerificationErrorType.unknownError,
-        message: 'Manual entry requires pnDigits to be provided via separate method',
+        message:
+            'Manual entry requires pnDigits to be provided via separate method',
       );
     }
 
@@ -93,8 +94,8 @@ class ManualPnEntryScanner implements DocumentScanner {
     // Must contain only digits
     if (!RegExp(r'^\d{11}$').hasMatch(pnDigits)) return false;
 
-    // TODO: Add checksum validation for Georgian personal numbers
-    // For MVP, basic format check is sufficient
+    // Checksum validation skipped for MVP (algorithm not public/standard)
+    // Basic format check (11 digits) is sufficient for Phase 0
     return true;
   }
 
@@ -116,7 +117,8 @@ class NFCDocumentScanner implements DocumentScanner {
   Future<DocumentScanResult> scanDocument(DocumentScanInput input) async {
     throw VerificationException(
       type: VerificationErrorType.unknownError,
-      message: 'NFC scanning not yet implemented - use ManualPnEntryScanner for MVP',
+      message:
+          'NFC scanning not yet implemented - use ManualPnEntryScanner for MVP',
     );
   }
 
@@ -143,7 +145,8 @@ class OCRDocumentScanner implements DocumentScanner {
   Future<DocumentScanResult> scanDocument(DocumentScanInput input) async {
     throw VerificationException(
       type: VerificationErrorType.unknownError,
-      message: 'OCR scanning not yet implemented - use ManualPnEntryScanner for MVP',
+      message:
+          'OCR scanning not yet implemented - use ManualPnEntryScanner for MVP',
     );
   }
 

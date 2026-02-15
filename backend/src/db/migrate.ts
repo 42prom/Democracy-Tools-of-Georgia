@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { query } from './client';
 
-const MIGRATIONS_DIR = path.join(__dirname, '..', '..', '..', 'db', 'migrations');
+const MIGRATIONS_DIR = path.join(__dirname, '..', '..', 'db', 'migrations');
 
 interface Migration {
   version: number;
@@ -37,6 +37,7 @@ async function getAppliedMigrations(): Promise<Set<number>> {
  * Get list of available migration files
  */
 async function getAvailableMigrations(): Promise<Migration[]> {
+  console.log('Searching for migrations in:', MIGRATIONS_DIR);
   const files = await fs.readdir(MIGRATIONS_DIR);
   const sqlFiles = files.filter(f => f.endsWith('.sql')).sort();
 
@@ -102,7 +103,23 @@ async function detectDockerInit(
 
   if (!result.rows[0]?.polls_exist) return; // Fresh database
 
-  console.log('Detected Docker-initialized database. Recording existing migrations...');
+  console.log('Detected Docker-initialized database. Checking column existence...');
+
+  // Only record as applied if we actually see the columns from later migrations
+  // e.g., migration 010 adds device_key_thumbprint
+  const columnCheck = await query(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'device_key_thumbprint'
+    ) AS col_exists
+  `);
+
+  if (!columnCheck.rows[0]?.col_exists) {
+    console.warn('⚠️  Database has tables but missing required columns (e.g., device_key_thumbprint). Skipping auto-record of all migrations.');
+    return;
+  }
+
+  console.log('Recording existing migrations in schema_migrations...');
 
   for (const migration of availableMigrations) {
     try {

@@ -1,6 +1,6 @@
-# DTFG Mobile App
+# DTG Mobile App
 
-Flutter mobile application for Democratic Tools for Georgia.
+Flutter mobile application for Democracy Tools Of Georgia.
 
 ## ✅ Implementation Complete
 
@@ -24,7 +24,7 @@ Flutter mobile application for Democratic Tools for Georgia.
    - Step 3.4: Receipt - "Vote Submitted!" with tx hash
 
 4. **Wallet**:
-   - Balance Card: "0.00 DTFG"
+   - Balance Card: "0.00 DTG"
    - Actions: Send, Receive (QR), Scan
    - Transaction History (empty state)
 
@@ -101,3 +101,4 @@ flutter build apk --release
 ✅ Wallet read-only first
 
 **Ready for Phase 0 testing** 🎉
+

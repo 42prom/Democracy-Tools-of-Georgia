@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requireAdmin } from '../../middleware/auth';
-import { createPoll, estimateAudience, publishPoll, getSurveyQuestions } from '../../services/polls';
+import { createPoll, estimateAudience, publishPoll, getSurveyQuestions, updatePoll } from '../../services/polls';
 import { AudienceRules } from '../../types/polls';
 import { createError } from '../../middleware/errorHandler';
 import { pool } from '../../db/client';
@@ -119,6 +119,7 @@ router.post(
   '/',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log(`[AdminRoute] POST / body:`, req.body);
       const pollData = req.body;
 
       // Validation
@@ -149,10 +150,12 @@ router.post(
         };
       }
 
+
       const poll = await createPoll(pollData);
 
       res.status(201).json(poll);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[AdminPolls] Create failed:', error);
       next(error);
     }
   }
@@ -186,34 +189,11 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     const { id } = req.params;
     const updates = req.body;
 
-    const fields: string[] = [];
-    const values: any[] = [];
-    let paramCount = 1;
+    const poll = await updatePoll(String(id), updates);
 
-    // Build dynamic UPDATE query
-    for (const [key, value] of Object.entries(updates)) {
-      if (key !== 'id') {
-        fields.push(`${key} = $${paramCount}`);
-        values.push(value);
-        paramCount++;
-      }
-    }
-
-    if (fields.length === 0) {
-      throw createError('No fields to update', 400);
-    }
-
-    values.push(id);
-    const query = `UPDATE polls SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-
-    const result = await pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      throw createError('Poll not found', 404);
-    }
-
-    res.json(result.rows[0]);
+    res.json(poll);
   } catch (error) {
+    console.error('[AdminPolls] Update failed:', error);
     next(error);
   }
 });
@@ -251,7 +231,8 @@ router.patch(
       const poll = await publishPoll(String(id));
 
       res.json(poll);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[AdminPolls] Publish failed:', error);
       next(error);
     }
   }
@@ -459,6 +440,74 @@ router.get(
           suppressedCells: 0,
           lastUpdated: new Date().toISOString(),
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ... (existing code)
+
+/**
+ * GET /api/v1/admin/polls/:id/results
+ * Get standard poll results (election/referendum)
+ */
+router.get(
+  '/:id/results',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      // Verify poll exists
+      const pollResult = await pool.query('SELECT * FROM polls WHERE id = $1', [id]);
+      if (pollResult.rows.length === 0) {
+        throw createError('Poll not found', 404);
+      }
+      // Get options
+      const optionsResult = await pool.query(
+        'SELECT id, text FROM poll_options WHERE poll_id = $1 ORDER BY display_order',
+        [id]
+      );
+      const options = optionsResult.rows;
+
+      // Get vote counts
+      const countsResult = await pool.query(
+        `SELECT option_id, COUNT(*) as count 
+         FROM votes 
+         WHERE poll_id = $1 
+         GROUP BY option_id`,
+        [id]
+      );
+      
+      const countsMap = new Map<string, number>();
+      let totalVotes = 0;
+      
+      countsResult.rows.forEach((row: any) => {
+        const count = parseInt(row.count, 10);
+        countsMap.set(row.option_id, count);
+        totalVotes += count;
+      });
+
+      const results = options.map((opt: any) => {
+        const count = countsMap.get(opt.id) || 0;
+        return {
+          optionId: opt.id,
+          optionText: opt.text,
+          count,
+          percentage: totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0
+        };
+      });
+
+      res.json({
+        pollId: id,
+        totalVotes,
+        results,
+        metadata: {
+          kThreshold: 0, // Admin sees raw counts for now
+          suppressedCells: 0,
+          lastUpdated: new Date().toISOString()
+        }
       });
     } catch (error) {
       next(error);

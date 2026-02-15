@@ -1,4 +1,4 @@
-# DTFG Smart Contracts
+# DTG Smart Contracts
 
 Phase 2 Implementation Plan.
 
@@ -11,5 +11,6 @@ The System operates a **Verifying Paymaster** that sponsors gas ONLY for valid v
 ## Architecture
 
 1.  **AccountFactory**: Deploys `SimpleAccount` proxies for users deterministically (`CREATE2`).
-2.  **Paymaster**: Checks `validUntil`, `validAfter`, and `signature` from the DTFG Backend.
+2.  **Paymaster**: Checks `validUntil`, `validAfter`, and `signature` from the DTG Backend.
 3.  **VoteAnchor**: A simple contract to store Merkle Roots of vote batches for auditability.
+

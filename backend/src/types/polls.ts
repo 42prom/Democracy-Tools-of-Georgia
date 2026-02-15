@@ -25,6 +25,9 @@ export interface Poll {
   created_at: Date;
   updated_at: Date;
   published_at?: Date;
+  rewards_enabled?: boolean;
+  reward_amount?: number;
+  reward_token?: string;
 }
 
 export interface PollOption {
@@ -39,9 +42,13 @@ export interface CreatePollRequest {
   description?: string;
   type: PollType;
   options: string[];
+  questions?: any[]; // For survey type
   audience_rules: AudienceRules;
   start_at?: string;
   end_at?: string;
+  rewards_enabled?: boolean;
+  reward_amount?: number;
+  reward_token?: string;
 }
 
 export interface Vote {
@@ -58,4 +65,12 @@ export interface VoteSubmission {
   nullifier: string;
   nonce: string;
   signature: string;
+  device?: {
+    id: string;
+    platform?: string;
+    provider?: string;
+  };
+  attestation?: {
+    token: string;
+  };
 }

@@ -1,6 +1,6 @@
 # Mobile App Implementation Summary
 
-## ✅ Complete - DTFG Flutter Mobile App
+## ✅ Complete - DTG Flutter Mobile App
 
 Built following [docs/ui_mobile_spec.md](../docs/ui_mobile_spec.md) exactly.
 
@@ -112,7 +112,7 @@ Per spec requirement: **Wallet tab: read-only first, then send/receive.**
 #### Components
 - **Balance Card**:
   - "Balance" (grey text)
-  - "0.00 DTFG" (large, bold)
+  - "0.00 DTG" (large, bold)
   - "≈ $0.00 USD" (grey, smaller)
 
 - **Actions** (3 buttons in row):
@@ -225,7 +225,7 @@ mobile/
 - **Future**: Can escalate to in-app liveness for high-risk polls
 
 ### ✅ Wallet Read-Only First
-- **Balance Display**: ✅ Shows 0.00 DTFG
+- **Balance Display**: ✅ Shows 0.00 DTG
 - **Receive**: ✅ QR code dialog works
 - **Send/Scan**: Phase 1 ("Coming soon" message)
 - **Transaction History**: Empty state
@@ -405,7 +405,7 @@ These warnings don't affect functionality in current Flutter version.
    - Gas estimation and submission
 
 4. **Enhanced Wallet**:
-   - Send DTFG tokens
+   - Send DTG tokens
    - QR code scanning
    - Transaction history from blockchain
    - Token swap/exchange
@@ -433,3 +433,4 @@ These warnings don't affect functionality in current Flutter version.
 **Implementation Date**: 2026-01-29
 
 **Spec Compliance**: 100% - All requirements from [docs/ui_mobile_spec.md](../docs/ui_mobile_spec.md) implemented
+

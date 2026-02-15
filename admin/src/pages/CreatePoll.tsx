@@ -7,6 +7,7 @@ import Select from '../components/ui/Select';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import DateTimePicker24h from '../components/ui/DateTimePicker24h';
+import RegionSelector from '../components/ui/RegionSelector';
 import { adminPollsApi, regionsApi } from '../api/client';
 import type { PollType, QuestionType, AudienceRules, AudienceEstimate, Region } from '../types';
 
@@ -86,7 +87,7 @@ export default function CreatePoll() {
   // Rewards
   const [rewardsEnabled, setRewardsEnabled] = useState(false);
   const [rewardAmount, setRewardAmount] = useState('0');
-  const [rewardToken, setRewardToken] = useState('DTFG');
+  const [rewardToken, setRewardToken] = useState('DTG');
 
   // Estimate
   const [estimateState, setEstimateState] = useState<EstimateState>('idle');
@@ -161,7 +162,7 @@ export default function CreatePoll() {
       if (poll.rewards_enabled) {
         setRewardsEnabled(true);
         setRewardAmount(poll.reward_amount?.toString() || '0');
-        setRewardToken(poll.reward_token || 'DTFG');
+        setRewardToken(poll.reward_token || 'DTG');
       }
     } catch (error) {
       console.error('Failed to load poll:', error);
@@ -304,7 +305,8 @@ export default function CreatePoll() {
   };
 
   const canPublish = () => {
-    if (title.trim() === '' || estimateState !== 'safe') return false;
+    // Allow publishing regardless of audience size (admin decision)
+    if (title.trim() === '') return false;
 
     if (pollType === 'survey') {
       return surveyQuestions.some((q) => q.questionText.trim() !== '');
@@ -438,9 +440,10 @@ export default function CreatePoll() {
       } else {
         resetForm();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to publish poll:', error);
-      alert('Failed to publish poll');
+      const message = error.response?.data?.error?.message || error.message || 'Unknown error';
+      alert(`Failed to publish poll: ${message}`);
     } finally {
       setIsPublishing(false);
     }
@@ -484,7 +487,7 @@ export default function CreatePoll() {
     setGender('all');
     setRewardsEnabled(false);
     setRewardAmount('0');
-    setRewardToken('DTFG');
+    setRewardToken('DTG');
     setEstimateState('idle');
     setEstimateData(null);
   };
@@ -1003,31 +1006,12 @@ export default function CreatePoll() {
               </div>
 
               {/* Regions */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Regions
-                </label>
-                <select
-                  multiple
-                  value={selectedRegions}
-                  onChange={(e) =>
-                    setSelectedRegions(
-                      Array.from(e.target.selectedOptions, (opt) => opt.value)
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  size={4}
-                >
-                  {regions.map((region) => (
-                    <option key={region.id} value={region.code}>
-                      {region.name_en} ({region.name_ka})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Hold Ctrl/Cmd to select multiple
-                </p>
-              </div>
+              <RegionSelector
+                regions={regions}
+                selectedRegionIds={selectedRegions}
+                onChange={setSelectedRegions}
+                helperText="Poll will be available to citizens in these regions. Leave empty for all."
+              />
 
               {/* Gender */}
               <div>
@@ -1093,7 +1077,7 @@ export default function CreatePoll() {
                     value={rewardToken}
                     onChange={(e) => setRewardToken(e.target.value)}
                     options={[
-                      { value: 'DTFG', label: 'DTFG' },
+                      { value: 'DTG', label: 'DTG' },
                       { value: 'ETH', label: 'ETH (Phase 1)' },
                       { value: 'USDC', label: 'USDC (Phase 1)' },
                     ]}
@@ -1150,7 +1134,7 @@ export default function CreatePoll() {
                 <p className="text-sm text-gray-600 mb-4">Estimated Reach</p>
                 <div className="w-full p-3 bg-green-100 rounded-lg mb-3">
                   <p className="text-xs text-green-800 text-center">
-                    Privacy-safe: Audience meets k-anonymity threshold (k ≥ 30)
+                    Privacy-safe: Audience meets safety threshold
                   </p>
                 </div>
                 {rewardsEnabled && rewardAmount && parseFloat(rewardAmount) > 0 && (
@@ -1175,10 +1159,10 @@ export default function CreatePoll() {
                 <p className="text-sm text-gray-600 mb-4">Estimated Reach</p>
                 <div className="w-full p-3 bg-red-100 rounded-lg">
                   <p className="text-xs text-red-800 text-center font-medium">
-                    Too small (count &lt; 30)
+                    Small audience warning
                   </p>
                   <p className="text-xs text-red-700 text-center mt-1">
-                    Cannot publish. Expand audience rules.
+                    Results may be suppressed for privacy. Consider expanding audience.
                   </p>
                 </div>
               </div>
@@ -1197,3 +1181,4 @@ export default function CreatePoll() {
     </div>
   );
 }
+

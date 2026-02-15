@@ -156,7 +156,7 @@ router.post('/import', upload.single('file'), async (req: Request, res: Response
             name_en: row.name_en,
             name_ka: row.name_ka,
             parent_region_id: row.parent_region_id || null,
-            active: row.active === 'true' || row.active === '1',
+            active: row.active !== undefined ? (row.active === 'true' || row.active === '1') : true,
           });
         })
         .on('end', resolve)

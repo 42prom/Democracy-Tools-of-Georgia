@@ -153,11 +153,14 @@ export default function SecurityLogs() {
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">
                       Event Type
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">
+                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">
                       Severity
                     </th>
                     <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">
                       Count
+                    </th>
+                    <th className="text-center py-3 px-4 text-sm font-semibold text-gray-900">
+                      Face Match Score
                     </th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">
                       First Seen
@@ -203,6 +206,20 @@ export default function SecurityLogs() {
                         {typeof event.count === 'number'
                           ? event.count.toLocaleString()
                           : event.count}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-center">
+                        {event.biometricScores?.faceMatch.avg ? (
+                          <div className="text-gray-900">
+                            <div className="font-semibold">
+                              {event.biometricScores.faceMatch.avg}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {event.biometricScores.faceMatch.min} - {event.biometricScores.faceMatch.max}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {event.firstSeen

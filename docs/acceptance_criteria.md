@@ -1,4 +1,4 @@
-# DTFG Acceptance Criteria
+# DTG Acceptance Criteria
 
 ## Module: Enrollment
 
@@ -65,3 +65,4 @@
   - **When** Admin tries to Publish
   - **Then** The system shows a "High Risk / Too Small Audience" error
   - **And** Prevents publication
+

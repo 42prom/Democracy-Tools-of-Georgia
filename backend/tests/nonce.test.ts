@@ -1,7 +1,7 @@
 import NonceService from '../src/services/nonce';
 import { connectRedis, closeRedis } from '../src/db/redis';
 
-describe('NonceService', () => {
+describe('Nonce Service & API', () => {
   beforeAll(async () => {
     await connectRedis();
   });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import apiClient from '../api/client';
 import { Save, X, CheckCircle, XCircle, Loader, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -16,15 +17,21 @@ const DOCUMENT_SCANNER_PROVIDERS = [
 ];
 
 const LIVENESS_PROVIDERS = [
-  { value: 'mock', label: 'Mock (MVP)' },
-  { value: 'provider', label: 'Provider (future)' },
-  { value: 'in_house', label: 'In-house (optional)' },
+  { value: '3d_face_detector', label: '3D Face Detector' },
+  { value: 'facetec', label: 'FaceTec' },
+  { value: 'iproov', label: 'iProov' },
+  { value: 'aws-rekognition', label: 'AWS Rekognition' },
+  { value: 'faceplusplus', label: 'Face++' },
+  { value: 'doublescript', label: 'DoubleScript' },
+  { value: 'provider', label: 'Remote Provider (Generic)' },
 ];
 
 const FACE_MATCH_PROVIDERS = [
-  { value: 'mock', label: 'Mock (MVP)' },
-  { value: 'provider', label: 'Provider (future)' },
-  { value: 'in_house', label: 'In-house (NEW)' },
+  { value: 'custom_biometric_matcher', label: 'Custom Biometric Matcher' },
+  { value: 'aws-rekognition', label: 'AWS Rekognition' },
+  { value: 'faceplusplus', label: 'Face++' },
+  { value: 'doublescript', label: 'DoubleScript' },
+  { value: 'provider', label: 'Remote Provider (Generic)' },
 ];
 
 interface VerificationConfig {
@@ -33,6 +40,7 @@ interface VerificationConfig {
     requireNfc: boolean;
     requireGeorgianCitizen: boolean;
     requirePersonalNumber: boolean;
+    allowSkipDocument: boolean;
   };
   documentScanner: {
     provider: string;
@@ -65,6 +73,7 @@ export default function SettingsVerificationProviders() {
       requireNfc: true,
       requireGeorgianCitizen: true,
       requirePersonalNumber: true,
+      allowSkipDocument: true,
     },
     documentScanner: {
       provider: 'manual',
@@ -72,8 +81,8 @@ export default function SettingsVerificationProviders() {
       requireDocumentPhotoScan: true,
       strictness: 'strict',
     },
-    liveness: { provider: 'mock', apiKey: '', minScore: 0.7, retryLimit: 3 },
-    faceMatch: { provider: 'mock', apiKey: '', minScore: 0.75 },
+    liveness: { provider: '3d_face_detector', apiKey: '', minScore: 0.7, retryLimit: 3 },
+    faceMatch: { provider: 'custom_biometric_matcher', apiKey: '', minScore: 0.75 },
   });
 
   const [originalConfig, setOriginalConfig] = useState<VerificationConfig>(config);
@@ -103,23 +112,33 @@ export default function SettingsVerificationProviders() {
   const loadConfig = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/v1/admin/settings', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use the generic settings endpoint if it returns full config, 
+      // OR use the specific verification-providers endpoint if that was the intent.
+      // Given the file structure likely wants the full unified settings object:
+      const response = await apiClient.get('/admin/settings');
+      const data = response.data;
 
-      if (response.ok) {
-        const data = await response.json();
+      if (data) {
+        // Ensure we only set the verification parts of the config to avoid overwriting state 
+        // if this component only manages verification.
+        // HOWEVER, the state `config` type includes ONLY verification fields.
+        // We need to match the backend response which now includes blockchain fields too.
+        // Safeguard: only pick what we need or leverage the fact that extra fields are ignored by strict types if defined,
+        // but here `VerificationConfig` is defined locally. 
+        // We'll trust the response shape to match or contain compatible fields.
         setConfig(data);
         setOriginalConfig(data);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setBanner({ type: 'error', message: err?.error?.message || 'Failed to load settings' });
       }
-    } catch (error) {
+
+      // Error handling is different with axios
+    } catch (error: unknown) {
       console.error('Failed to load verification providers config:', error);
-      setBanner({ type: 'error', message: 'Failed to load settings (network error)' });
+      const err = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      setBanner({ 
+        type: 'error', 
+        message: err.response?.data?.error?.message || err.message || 'Failed to load settings' 
+      });
+
     } finally {
       setLoading(false);
     }
@@ -127,27 +146,37 @@ export default function SettingsVerificationProviders() {
 
   const handleSave = async () => {
     setSaving(true);
+    setBanner(null);
     try {
-      const response = await fetch('/api/v1/admin/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(config),
-      });
+      console.log('Using config for update:', config);
 
-      if (response.ok) {
-        const data = await response.json();
+      // Explicitly construct payload to match what backend expects for partial updates
+      // This defends against extra UI state polluting the request
+      const payload = {
+        nfc: config.nfc,
+        documentScanner: config.documentScanner,
+        liveness: config.liveness,
+        faceMatch: config.faceMatch,
+      };
+
+      const response = await apiClient.patch('/admin/settings', payload);
+      const data = response.data;
+
+      if (data) {
         setConfig(data);
         setOriginalConfig(data);
         setBanner({ type: 'success', message: 'Settings saved successfully' });
       } else {
-        const err = await response.json().catch(() => ({}));
-        setBanner({ type: 'error', message: err?.error?.message || 'Failed to save settings' });
+        throw new Error('No data returned from save operation');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to save settings:', error);
-      setBanner({ type: 'error', message: 'Failed to save settings (network error)' });
+      const err = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      const msg = err.response?.data?.error?.message 
+        || (err.response?.data?.error as string)
+        || err.message 
+        || 'Failed to save settings';
+      setBanner({ type: 'error', message: msg });
     } finally {
       setSaving(false);
     }
@@ -170,21 +199,15 @@ export default function SettingsVerificationProviders() {
     setStatus({ status: 'testing', message: 'Testing connection...' });
 
     try {
-      const response = await fetch('/api/v1/admin/settings/verification-providers/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider: config[provider].provider,
-          apiKey: config[provider].apiKey,
-          type: provider,
-        }),
+      const response = await apiClient.post('/admin/settings/verification-providers/test', {
+        provider: config[provider].provider,
+        apiKey: config[provider].apiKey,
+        type: provider,
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setStatus({
           status: 'success',
           message: data.message || 'Connection successful!',
@@ -195,10 +218,11 @@ export default function SettingsVerificationProviders() {
           message: data.error || 'Connection failed',
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
       setStatus({
         status: 'error',
-        message: 'Connection test failed',
+        message: err.response?.data?.error || 'Connection test failed',
       });
     }
   };
@@ -238,11 +262,9 @@ export default function SettingsVerificationProviders() {
         </div>
       )}
 
-      {/* Warning Banner for Mock Providers */}
+      {/* Warning Banner for Mock/Manual Providers */}
       {(config.nfc.provider === 'mock' ||
-        config.documentScanner.provider === 'manual' ||
-        config.liveness.provider === 'mock' ||
-        config.faceMatch.provider === 'mock') && (
+        config.documentScanner.provider === 'manual') && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -260,11 +282,7 @@ export default function SettingsVerificationProviders() {
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
-                <strong className="font-medium">Development Mode Active:</strong> You are using mock/manual providers that bypass actual verification.
-                {' '}<strong>Do not use in production!</strong> Mock providers accept all verification attempts without proper security checks.
-              </p>
-              <p className="text-xs text-yellow-600 mt-1">
-                For production use, configure real verification providers (NFC, FaceTec, AWS Rekognition, etc.) with proper API keys.
+                <strong className="font-medium">Manual/Mock NFC Active:</strong> You are using providers that may bypass actual biometric verification.
               </p>
             </div>
           </div>
@@ -347,6 +365,20 @@ export default function SettingsVerificationProviders() {
                 />
                 Require personal number
               </label>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={config.nfc.allowSkipDocument}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      nfc: { ...config.nfc, allowSkipDocument: e.target.checked },
+                    })
+                  }
+                />
+                Allow skip Document Scan (if NFC has portrait)
+              </label>
             </div>
 
             {/* Test connection (disabled for on-device providers) */}
@@ -421,7 +453,7 @@ export default function SettingsVerificationProviders() {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      documentScanner: { ...config.documentScanner, strictness: e.target.value as any },
+                      documentScanner: { ...config.documentScanner, strictness: e.target.value as 'strict' | 'lenient' },
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -477,9 +509,9 @@ export default function SettingsVerificationProviders() {
                 onClick={() => testConnection('documentScanner', setDocumentTestStatus)}
                 disabled={
                   documentTestStatus.status === 'testing' ||
-                  (config.documentScanner.provider !== 'manual' &&
-                    !config.documentScanner.provider.startsWith('on_device') &&
-                    !config.documentScanner.apiKey)
+                  config.documentScanner.provider !== 'provider' ||
+                  !config.documentScanner.apiKey ||
+                  String(config.documentScanner.apiKey).includes('•')
                 }
               >
                 Test Connection
@@ -572,32 +604,6 @@ export default function SettingsVerificationProviders() {
               </div>
             )}
 
-            {/* Min Score Threshold */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Minimum Score Threshold
-              </label>
-              <Input
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={config.liveness.minScore}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    liveness: {
-                      ...config.liveness,
-                      minScore: parseFloat(e.target.value),
-                    },
-                  })
-                }
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Score range: 0.0 to 1.0 (current: {config.liveness.minScore})
-              </p>
-            </div>
-
             {/* Retry Limit */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -606,20 +612,20 @@ export default function SettingsVerificationProviders() {
               <Input
                 type="number"
                 min="1"
-                max="10"
+                max="20"
                 value={config.liveness.retryLimit}
                 onChange={(e) =>
                   setConfig({
                     ...config,
                     liveness: {
                       ...config.liveness,
-                      retryLimit: parseInt(e.target.value),
+                      retryLimit: parseInt(e.target.value) || 5,
                     },
                   })
                 }
               />
               <p className="text-xs text-gray-500 mt-1">
-                Maximum number of retry attempts
+                Maximum failed liveness attempts before user is temporarily blocked. This setting is applied dynamically.
               </p>
             </div>
 
@@ -630,7 +636,9 @@ export default function SettingsVerificationProviders() {
                 onClick={() => testConnection('liveness', setLivenessTestStatus)}
                 disabled={
                   livenessTestStatus.status === 'testing' ||
-                  (config.liveness.provider !== 'mock' && !config.liveness.apiKey)
+                  config.liveness.provider !== 'provider' ||
+                  !config.liveness.apiKey ||
+                  String(config.liveness.apiKey).includes('•')
                 }
               >
                 Test Connection
@@ -728,24 +736,30 @@ export default function SettingsVerificationProviders() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Minimum Score Threshold
               </label>
-              <Input
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={config.faceMatch.minScore}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    faceMatch: {
-                      ...config.faceMatch,
-                      minScore: parseFloat(e.target.value),
-                    },
-                  })
-                }
-              />
+              <div className="mt-1 flex items-center space-x-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={config.faceMatch.minScore}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        faceMatch: {
+                          ...config.faceMatch,
+                          minScore: parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                    {config.faceMatch.minScore.toFixed(2)}
+                  </span>
+               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Score range: 0.0 to 1.0 (current: {config.faceMatch.minScore})
+                Score range: 0.0 to 1.0 (current: {config.faceMatch.minScore.toFixed(2)})
               </p>
             </div>
 
@@ -756,7 +770,9 @@ export default function SettingsVerificationProviders() {
                 onClick={() => testConnection('faceMatch', setFaceMatchTestStatus)}
                 disabled={
                   faceMatchTestStatus.status === 'testing' ||
-                  (config.faceMatch.provider !== 'mock' && !config.faceMatch.apiKey)
+                  config.faceMatch.provider !== 'provider' ||
+                  !config.faceMatch.apiKey ||
+                  String(config.faceMatch.apiKey).includes('•')
                 }
               >
                 Test Connection

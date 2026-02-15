@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import redisClient from '../db/redis';
+import { createError } from '../middleware/errorHandler';
 
 const NONCE_TTL_SECONDS = 60; // 60 second TTL
 const NONCE_PREFIX = 'nonce:';
@@ -11,14 +12,19 @@ export class NonceService {
    * @returns Generated nonce string
    */
   static async generateNonce(type: 'challenge' | 'vote' = 'challenge'): Promise<string> {
-    // Generate cryptographically secure random 32-byte hex string
-    const nonce = crypto.randomBytes(32).toString('hex');
-    const key = `${NONCE_PREFIX}${type}:${nonce}`;
+    try {
+      // Generate cryptographically secure random 32-byte hex string
+      const nonce = crypto.randomBytes(32).toString('hex');
+      const key = `${NONCE_PREFIX}${type}:${nonce}`;
 
-    // Store in Redis with TTL
-    await redisClient.setEx(key, NONCE_TTL_SECONDS, '1');
+      // Store in Redis with TTL
+      await redisClient.setEx(key, NONCE_TTL_SECONDS, '1');
 
-    return nonce;
+      return nonce;
+    } catch (error: any) {
+      console.error('[Nonce] Redis error during generation:', error.message);
+      throw createError('Service temporarily unavailable. Please try again.', 503);
+    }
   }
 
   /**
@@ -52,9 +58,9 @@ export class NonceService {
       });
 
       return result === 1;
-    } catch (error) {
-      console.error('Nonce verification error:', error);
-      return false;
+    } catch (error: any) {
+      console.error('[Nonce] Redis error during verification:', error.message);
+      throw createError('Service temporarily unavailable. Please try again.', 503);
     }
   }
 

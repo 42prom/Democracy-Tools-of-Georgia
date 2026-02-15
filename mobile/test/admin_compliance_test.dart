@@ -63,7 +63,7 @@ void main() {
       if (await androidManifest.exists()) {
         final content = await androidManifest.readAsString();
         expect(
-          content.contains('android:scheme="dtfg-admin"'),
+          content.contains('android:scheme="DTG-admin"'),
           isFalse,
           reason: 'AndroidManifest contains admin deep link',
         );
@@ -74,7 +74,7 @@ void main() {
       if (await iosPlist.exists()) {
         final content = await iosPlist.readAsString();
         expect(
-          content.contains('dtfg-admin'),
+          content.contains('DTG-admin'),
           isFalse,
           reason: 'Info.plist contains admin deep link',
         );
@@ -187,3 +187,4 @@ void main() {
     });
   });
 }
+

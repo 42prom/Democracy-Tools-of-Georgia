@@ -27,7 +27,7 @@ grep -r "admin\|Admin\|ADMIN" mobile/lib/**/*.dart
 ### 2. ✅ No Deep Links to Admin Functionality
 
 **Android**: `android/app/src/main/AndroidManifest.xml`
-- ✅ No `dtfg-admin://` scheme
+- ✅ No `DTG-admin://` scheme
 - ✅ No admin intent filters
 
 **iOS**: `ios/Runner/Info.plist`
@@ -242,3 +242,4 @@ grep -i "admin" pubspec.yaml
 **Verified By**: Automated compliance test suite
 **Test Coverage**: 8 compliance tests, all passing
 **Last Run**: 2026-01-30
+

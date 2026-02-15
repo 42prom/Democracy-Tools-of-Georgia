@@ -1,6 +1,6 @@
-# DTFG Admin Panel
+# DTG Admin Panel
 
-Admin web interface for Democratic Tools for Georgia voting system.
+Admin web interface for Democracy Tools Of Georgia voting system.
 
 ## Tech Stack
 
@@ -141,4 +141,5 @@ Development server proxies API requests to `http://localhost:3000`. Update `vite
 
 ## License
 
-Proprietary - Democratic Tools for Georgia
+Proprietary - Democracy Tools Of Georgia
+

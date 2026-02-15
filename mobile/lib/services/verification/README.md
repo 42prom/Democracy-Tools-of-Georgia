@@ -1,6 +1,6 @@
 # Mobile Verification Layer
 
-Privacy-preserving identity verification for DTFG mobile app with **replaceable implementations**.
+Privacy-preserving identity verification for DTG mobile app with **replaceable implementations**.
 
 ## Overview
 
@@ -339,4 +339,5 @@ All app logic remains unchanged because implementations follow the same interfac
 
 ## License
 
-Internal DTFG project - All rights reserved
+Internal DTG project - All rights reserved
+

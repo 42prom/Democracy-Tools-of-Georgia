@@ -51,7 +51,7 @@ export default function ActivePolls() {
     }
 
     try {
-      await adminPollsApi.update(pollId, { status: 'closed' });
+      await adminPollsApi.update(pollId, { status: 'ended' });
       setPolls(polls.filter((poll) => poll.id !== pollId));
       alert('Poll closed successfully');
     } catch (error) {

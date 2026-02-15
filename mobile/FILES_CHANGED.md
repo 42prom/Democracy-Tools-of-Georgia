@@ -70,7 +70,7 @@ static const String baseUrl = 'http://localhost:3000/api/v1';
 - **Android Emulator:** `http://10.0.2.2:3000/api/v1`
 - **iOS Simulator:** `http://localhost:3000/api/v1`
 - **Physical Device:** `http://YOUR_COMPUTER_IP:3000/api/v1` (e.g., `http://192.168.1.100:3000/api/v1`)
-- **Production:** `https://api.dtfg.ge/api/v1`
+- **Production:** `https://api.DTG.ge/api/v1`
 
 ### Mock Verification Behavior
 **File:** `lib/screens/enrollment/verification_screen.dart` (Lines 21-22)
@@ -126,3 +126,4 @@ curl -X POST http://localhost:3000/api/v1/auth/login-or-enroll \
 - Dashboard screen has **footer** (Wallet | Voting | Settings)
 - BASE_URL: `lib/services/auth_api.dart`
 - Ready for testing!
+

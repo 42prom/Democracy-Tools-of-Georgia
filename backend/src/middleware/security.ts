@@ -22,6 +22,7 @@ export const securityHeaders = helmet({
 
 /**
  * CORS middleware with strict origin control
+ * Supports local development, Cloudflare Tunnel, and custom domains
  */
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
@@ -30,18 +31,46 @@ export const corsMiddleware = cors({
       'http://localhost:3000',
     ];
 
-    // Allow requests with no origin (mobile apps, Postman, etc.)
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
     if (!origin) {
       return callback(null, true);
     }
 
+    // Check exact match
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+
+    // Allow Cloudflare Tunnel domains (*.trycloudflare.com)
+    if (origin.endsWith('.trycloudflare.com')) {
+      return callback(null, true);
+    }
+
+    // Allow esme.ge domain (production tunnel)
+    if (origin.endsWith('.esme.ge') || origin === 'https://esme.ge') {
+      return callback(null, true);
+    }
+
+    // Allow any localhost port for development
+    if (origin.match(/^http:\/\/localhost:\d+$/)) {
+      return callback(null, true);
+    }
+
+    // Allow 10.0.2.2 (Android emulator) and 127.0.0.1
+    if (origin.match(/^http:\/\/(10\.0\.2\.2|127\.0\.0\.1)(:\d+)?$/)) {
+      return callback(null, true);
+    }
+
+    // In development mode, allow all origins
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[CORS] Allowing origin in dev mode: ${origin}`);
+      return callback(null, true);
+    }
+
+    callback(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  exposedHeaders: ['X-Request-ID'],
 });

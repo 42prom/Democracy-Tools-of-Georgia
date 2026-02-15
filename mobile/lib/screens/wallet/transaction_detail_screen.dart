@@ -6,19 +6,14 @@ import 'package:intl/intl.dart';
 class TransactionDetailScreen extends StatelessWidget {
   final Transaction transaction;
 
-  const TransactionDetailScreen({
-    super.key,
-    required this.transaction,
-  });
+  const TransactionDetailScreen({super.key, required this.transaction});
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM dd, yyyy HH:mm');
+    final dateFormat = DateFormat('dd-MM-yyyy HH:mm');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transaction Details'),
-      ),
+      appBar: AppBar(title: const Text('Transaction Details')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -31,7 +26,9 @@ class TransactionDetailScreen extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: _getStatusColor(transaction.status).withValues(alpha: 0.1),
+                    color: _getStatusColor(
+                      transaction.status,
+                    ).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -47,9 +44,9 @@ class TransactionDetailScreen extends StatelessWidget {
               Text(
                 transaction.status.name.toUpperCase(),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: _getStatusColor(transaction.status),
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: _getStatusColor(transaction.status),
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -61,15 +58,18 @@ class TransactionDetailScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        transaction.type == TransactionType.send ? 'Sent' : 'Received',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.grey,
-                            ),
+                        transaction.type == TransactionType.send
+                            ? 'Sent'
+                            : 'Received',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '${transaction.type == TransactionType.send ? '-' : '+'} ${transaction.amount} ${transaction.token}',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: transaction.type == TransactionType.send
                                   ? Colors.red
@@ -112,11 +112,7 @@ class TransactionDetailScreen extends StatelessWidget {
               ],
               if (transaction.note != null && transaction.note!.isNotEmpty) ...[
                 const Divider(),
-                _buildDetailRow(
-                  context,
-                  'Note',
-                  transaction.note!,
-                ),
+                _buildDetailRow(context, 'Note', transaction.note!),
               ],
             ],
           ),
@@ -140,9 +136,9 @@ class TransactionDetailScreen extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
             ),
           ),
           Expanded(

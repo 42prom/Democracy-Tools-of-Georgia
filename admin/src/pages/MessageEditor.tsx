@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import DateTimePicker24h from '../components/ui/DateTimePicker24h';
 import MessagePreview from '../components/MessagePreview';
+import RegionSelector from '../components/ui/RegionSelector';
 import { adminMessagesApi, regionsApi } from '../api/client';
 import type { MessageType, Region } from '../types';
 
@@ -113,7 +114,8 @@ export default function MessageEditor() {
       navigate('/messages');
     } catch (error) {
       console.error('Failed to save message:', error);
-      alert('Failed to save message');
+      const msg = (error as any).response?.data?.error || (error as any).message;
+      alert(`Failed to save message: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -144,7 +146,8 @@ export default function MessageEditor() {
       navigate('/messages');
     } catch (error) {
       console.error('Failed to publish message:', error);
-      alert('Failed to publish message');
+      const msg = (error as any).response?.data?.error || (error as any).message;
+      alert(`Failed to publish message: ${msg}`);
     } finally {
       setPublishing(false);
     }
@@ -267,55 +270,12 @@ export default function MessageEditor() {
               </div>
 
               {/* Regions */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Regions
-                </label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {selectedRegions.map((regionId) => {
-                    const region = regions.find((r) => r.id === regionId);
-                    return (
-                      <span
-                        key={regionId}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
-                      >
-                        {region
-                          ? `${region.name_en} / ${region.name_ka}`
-                          : regionId}
-                        <button
-                          onClick={() =>
-                            setSelectedRegions(
-                              selectedRegions.filter((r) => r !== regionId)
-                            )
-                          }
-                          className="ml-1.5 text-primary-600 hover:text-primary-800"
-                        >
-                          &times;
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  value=""
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val && !selectedRegions.includes(val)) {
-                      setSelectedRegions([...selectedRegions, val]);
-                    }
-                  }}
-                >
-                  <option value="">Select region...</option>
-                  {regions
-                    .filter((r) => !selectedRegions.includes(r.id))
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name_en} / {r.name_ka}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              <RegionSelector
+                regions={regions}
+                selectedRegionIds={selectedRegions}
+                onChange={setSelectedRegions}
+                helperText="Messages will be delivered to citizens in these regions. Leave empty for all."
+              />
 
               {/* Gender */}
               <div>

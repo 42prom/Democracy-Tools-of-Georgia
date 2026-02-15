@@ -94,7 +94,7 @@ flutter analyze --no-pub
    - ✅ Empty state: "No polls available"
 
 3. **Wallet Tab** (Index 2):
-   - ✅ Balance card (0.00 DTFG)
+   - ✅ Balance card (0.00 DTG)
    - ✅ Send button (coming soon)
    - ✅ Receive button (shows QR dialog) ✅
    - ✅ Scan button (coming soon)
@@ -170,3 +170,4 @@ Modified:
 **Date**: 2026-01-30
 **Approach**: EDIT-IN-PLACE ONLY (no rebuilding from scratch)
 **Result**: Success - Zero errors, clean integration
+

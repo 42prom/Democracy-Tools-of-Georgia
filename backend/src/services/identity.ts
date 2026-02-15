@@ -2,40 +2,11 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/client';
 import { getJwtSecret } from '../config/jwt';
-import { issueCredentialForSubject } from './credentials';
+import { getPnHashSecret } from '../config/secrets';
 
-const PN_HASH_SECRET = process.env.PN_HASH_SECRET || 'CHANGE_ME_IN_PRODUCTION';
+const PN_HASH_SECRET = getPnHashSecret();
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
-const SESSION_EXPIRY_MINUTES = 2;
-
-interface BiometricCheck {
-  passed: boolean;
-  score: number;
-}
-
-interface LoginOrEnrollRequest {
-  pnDigits: string;
-  liveness: BiometricCheck;
-  faceMatch: BiometricCheck;
-  gender?: 'M' | 'F' | 'UNKNOWN';
-  birthYear?: number;
-  regionCodes?: string[];
-  ipAddress?: string;
-  userAgent?: string;
-}
-
-interface LoginOrEnrollResponse {
-  isNew: boolean;
-  userId: string;
-  credential: {
-    gender?: string;
-    birthYear?: number;
-    regionCodes?: string[];
-  };
-  sessionAttestation: string;
-  credentialToken: string;
-}
 
 /**
  * Compute HMAC hash of personal number
@@ -147,40 +118,6 @@ export async function clearRateLimit(pnHash: string, ipAddress: string): Promise
 }
 
 /**
- * Generate session attestation JWT
- * Phase 0/1: Should be compatible with VotingCredential for access control
- */
-export function generateSessionAttestation(userId: string, credential: any): string {
-  const payload = {
-    iss: 'dtfg-identity-service',
-    sub: userId, // Use userId as subject for session tokens
-    data: {
-      age_bucket: credential.birthYear ? calculateAgeBucket(credential.birthYear) : '25-34', // Mock/default
-      gender: credential.gender || 'O',
-      region_codes: credential.regionCodes || [],
-      citizenship: 'GEO',
-    },
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + SESSION_EXPIRY_MINUTES * 60,
-  };
-
-  return jwt.sign(payload, getJwtSecret(), { algorithm: 'HS256' });
-}
-
-/**
- * Helper to calculate age bucket from birth year
- */
-function calculateAgeBucket(birthYear: number): any {
-  const age = new Date().getFullYear() - birthYear;
-  if (age < 25) return '18-24';
-  if (age < 35) return '25-34';
-  if (age < 45) return '35-44';
-  if (age < 55) return '45-54';
-  if (age < 65) return '55-64';
-  return '65+';
-}
-
-/**
  * Verify session attestation JWT
  */
 export function verifySessionAttestation(token: string): any {
@@ -189,125 +126,4 @@ export function verifySessionAttestation(token: string): any {
   } catch (error) {
     throw new Error('Invalid or expired session attestation');
   }
-}
-
-/**
- * Main login or enroll flow
- */
-export async function loginOrEnroll(
-  request: LoginOrEnrollRequest
-): Promise<LoginOrEnrollResponse> {
-  const { pnDigits, liveness, faceMatch, gender, birthYear, regionCodes, ipAddress, userAgent } =
-    request;
-
-  // 1. Validate personal number format
-  const validation = validatePersonalNumber(pnDigits);
-  if (!validation.valid) {
-    throw new Error(validation.error);
-  }
-
-  // 2. Compute hash
-  const pnHash = computePnHash(pnDigits);
-
-  // 3. Check rate limits
-  const rateLimitCheck = await checkRateLimit(pnHash, ipAddress || '0.0.0.0');
-  if (!rateLimitCheck.allowed) {
-    await pool.query(
-      `INSERT INTO security_events
-       (pn_hash, event_type, result, reason_code, ip_address, user_agent, created_at)
-       VALUES ($1, 'LOGIN', 'BLOCKED', 'RATE_LIMIT', $2, $3, NOW())`,
-      [pnHash, ipAddress, userAgent]
-    );
-    throw new Error(rateLimitCheck.reason || 'Rate limit exceeded');
-  }
-
-  // 4. Validate biometric checks
-  if (!liveness.passed) {
-    await recordFailedAttempt(pnHash, ipAddress || '0.0.0.0');
-    await pool.query(
-      `INSERT INTO security_events
-       (pn_hash, event_type, result, liveness_score, face_match_score, reason_code, ip_address, user_agent)
-       VALUES ($1, 'LOGIN', 'FAIL', $2, $3, 'LIVENESS_FAILED', $4, $5)`,
-      [pnHash, liveness.score, faceMatch.score, ipAddress, userAgent]
-    );
-    throw new Error('Liveness check failed');
-  }
-
-  if (!faceMatch.passed) {
-    await recordFailedAttempt(pnHash, ipAddress || '0.0.0.0');
-    await pool.query(
-      `INSERT INTO security_events
-       (pn_hash, event_type, result, liveness_score, face_match_score, reason_code, ip_address, user_agent)
-       VALUES ($1, 'LOGIN', 'FAIL', $2, $3, 'FACE_MATCH_FAILED', $4, $5)`,
-      [pnHash, liveness.score, faceMatch.score, ipAddress, userAgent]
-    );
-    throw new Error('Face match check failed');
-  }
-
-  // 5. Find or create user
-  const userResult = await pool.query(`SELECT * FROM users WHERE pn_hash = $1`, [pnHash]);
-
-  let userId: string;
-  let isNew: boolean;
-  let eventType: 'ENROLL' | 'LOGIN';
-
-  if (userResult.rows.length === 0) {
-    // New user - enroll
-    const insertResult = await pool.query(
-      `INSERT INTO users (pn_hash, credential_gender, credential_birth_year, credential_region_codes, created_at, last_login_at)
-       VALUES ($1, $2, $3, $4, NOW(), NOW())
-       RETURNING id`,
-      [pnHash, gender || 'UNKNOWN', birthYear, regionCodes || []]
-    );
-    userId = insertResult.rows[0].id;
-    isNew = true;
-    eventType = 'ENROLL';
-  } else {
-    // Existing user - login
-    userId = userResult.rows[0].id;
-    await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [userId]);
-    isNew = false;
-    eventType = 'LOGIN';
-  }
-
-  // 6. Record successful event
-  await pool.query(
-    `INSERT INTO security_events
-     (user_id, pn_hash, event_type, result, liveness_score, face_match_score, ip_address, user_agent)
-     VALUES ($1, $2, $3, 'PASS', $4, $5, $6, $7)`,
-    [userId, pnHash, eventType, liveness.score, faceMatch.score, ipAddress, userAgent]
-  );
-
-  // 7. Clear rate limits on success
-  await clearRateLimit(pnHash, ipAddress || '0.0.0.0');
-
-  // 8. Generate session attestation
-  const credential = {
-    gender,
-    birthYear,
-    regionCodes,
-  };
-
-  const sessionAttestation = generateSessionAttestation(userId, credential);
-
-  // Long-lived credential token used by API Authorization (Bearer)
-  // Keep sessionAttestation short-lived for session verification flows.
-  const credentialToken = issueCredentialForSubject(
-    userId,
-    {
-      age_bucket: birthYear ? calculateAgeBucket(birthYear) : '25-34',
-      gender: (gender === 'M' ? 'M' : gender === 'F' ? 'F' : 'O'),
-      region_codes: regionCodes || [],
-      citizenship: 'GEO',
-    } as any,
-    7 * 24 * 60 * 60
-  );
-
-  return {
-    isNew,
-    userId,
-    credential,
-    sessionAttestation,
-    credentialToken,
-  };
 }

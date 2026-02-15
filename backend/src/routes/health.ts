@@ -1,39 +1,136 @@
 import { Router, Request, Response } from 'express';
-import { checkHealth } from '../db/client';
-import { checkRedisHealth } from '../db/redis';
+import { pool } from '../db/client';
+import redisClient from '../db/redis';
+import { HttpClientFactory } from '../utils/httpClient';
+import { getMetrics } from '../middleware/metrics';
 
 const router = Router();
 
+interface HealthCheckResult {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  dependencies: {
+    postgres: DependencyStatus;
+    redis: DependencyStatus;
+    'biometric-service'?: DependencyStatus;
+  };
+}
+
+interface DependencyStatus {
+  status: 'up' | 'down';
+  latency_ms?: number;
+  error?: string;
+}
+
 /**
+ * Health endpoint with dependency checks
  * GET /health
- * Health check endpoint
  */
-router.get('/health', async (_req: Request, res: Response) => {
-  try {
-    const dbHealthy = await checkHealth();
-    const redisHealthy = await checkRedisHealth();
+router.get('/', async (_req: Request, res: Response) => {
+  const result: HealthCheckResult = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    dependencies: {
+      postgres: await checkPostgres(),
+      redis: await checkRedis(),
+    },
+  };
 
-    const status = dbHealthy && redisHealthy ? 'ok' : 'degraded';
-    const statusCode = status === 'ok' ? 200 : 503;
+  // Always check biometric service (important for face matching flow)
+  result.dependencies['biometric-service'] = await checkBiometricService();
 
-    res.status(statusCode).json({
-      status,
-      timestamp: new Date().toISOString(),
-      services: {
-        database: dbHealthy ? 'connected' : 'disconnected',
-        redis: redisHealthy ? 'connected' : 'disconnected',
-      },
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      services: {
-        database: 'error',
-        redis: 'error',
-      },
-    });
+  // Determine overall status
+  const allUp = Object.values(result.dependencies).every(dep => dep.status === 'up');
+  const anyDown = Object.values(result.dependencies).some(dep => dep.status === 'down');
+
+  if (anyDown) {
+    result.status = 'unhealthy';
+    res.status(503);
+  } else if (!allUp) {
+    result.status = 'degraded';
+    res.status(200); // Still accepting traffic
   }
+
+  res.json(result);
+});
+
+/**
+ * Check Postgres connectivity
+ */
+async function checkPostgres(): Promise<DependencyStatus> {
+  const start = Date.now();
+  try {
+    await pool.query('SELECT 1');
+    return {
+      status: 'up',
+      latency_ms: Date.now() - start,
+    };
+  } catch (error: any) {
+    return {
+      status: 'down',
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Check Redis connectivity
+ */
+async function checkRedis(): Promise<DependencyStatus> {
+  const start = Date.now();
+  try {
+    await redisClient.ping();
+    return {
+      status: 'up',
+      latency_ms: Date.now() - start,
+    };
+  } catch (error: any) {
+    return {
+      status: 'down',
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Check Biometric Service connectivity (uses fast health client)
+ */
+async function checkBiometricService(): Promise<DependencyStatus & { circuit_breaker?: string }> {
+  const start = Date.now();
+  try {
+    // Use dedicated health client with short timeout (3s)
+    const healthClient = HttpClientFactory.getBiometricHealthClient();
+    await healthClient.get('/health');
+
+    // Also check main client's circuit breaker state
+    const mainClient = HttpClientFactory.getBiometricClient();
+    const circuitState = mainClient.getCircuitState();
+
+    return {
+      status: 'up',
+      latency_ms: Date.now() - start,
+      circuit_breaker: circuitState,
+    };
+  } catch (error: any) {
+    // Check main client's circuit breaker state even on failure
+    const mainClient = HttpClientFactory.getBiometricClient();
+    const circuitState = mainClient.getCircuitState();
+
+    return {
+      status: 'down',
+      error: error.message,
+      circuit_breaker: circuitState,
+    };
+  }
+}
+
+/**
+ * Metrics endpoint for observability
+ * GET /metrics
+ */
+router.get('/metrics', (_req: Request, res: Response) => {
+  const stats = getMetrics();
+  res.json(stats);
 });
 
 export default router;

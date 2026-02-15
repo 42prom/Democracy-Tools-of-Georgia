@@ -8,6 +8,9 @@ class ActivityItem {
   final String? endsAt; // ISO8601 string from poll.endAt
   final String? status; // e.g. 'ENDED'
 
+  final String? rewardAmount;
+  final String? rewardToken;
+
   ActivityItem({
     required this.pollId,
     required this.title,
@@ -15,6 +18,8 @@ class ActivityItem {
     required this.votedAt,
     this.endsAt,
     this.status,
+    this.rewardAmount,
+    this.rewardToken,
   });
 
   bool get hasEnded {
@@ -27,26 +32,34 @@ class ActivityItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'pollId': pollId,
-        'title': title,
-        'type': type,
-        'votedAt': votedAt.toIso8601String(),
-        'endsAt': endsAt,
-        'status': status,
-      };
+    'pollId': pollId,
+    'title': title,
+    'type': type,
+    'votedAt': votedAt.toIso8601String(),
+    'endsAt': endsAt,
+    'status': status,
+    'rewardAmount': rewardAmount,
+    'rewardToken': rewardToken,
+  };
 
   factory ActivityItem.fromJson(Map<String, dynamic> json) => ActivityItem(
-        pollId: json['pollId'],
-        title: json['title'],
-        type: json['type'],
-        votedAt: DateTime.parse(json['votedAt']),
-        endsAt: json['endsAt'],
-        status: json['status'],
-      );
+    pollId: json['pollId'],
+    title: json['title'],
+    type: json['type'],
+    votedAt: DateTime.parse(json['votedAt']),
+    endsAt: json['endsAt'],
+    status: json['status'],
+    rewardAmount:
+        json['rewardAmount']?.toString() ??
+        json['reward']?['amount']?.toString(),
+    rewardToken: json['rewardToken'] ?? json['reward']?['token'],
+  );
 
   static List<ActivityItem> listFromJsonString(String jsonString) {
     final List<dynamic> list = json.decode(jsonString);
-    return list.map((e) => ActivityItem.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => ActivityItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   static String listToJsonString(List<ActivityItem> items) {
