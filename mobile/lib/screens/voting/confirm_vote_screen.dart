@@ -45,9 +45,7 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
     try {
       // STEP 1: Request challenge nonce
       // POST /api/v1/attestations/challenge
-      setState(
-        () => _statusMessage = loc.translate('step_1_5_challenge'),
-      );
+      setState(() => _statusMessage = loc.translate('step_1_5_challenge'));
       final challengeResponse = await _apiService.requestChallenge();
       final String nonce = challengeResponse['nonce'];
 
@@ -129,7 +127,8 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
             builder: (context) => VoteReceiptScreen(
               poll: widget.poll,
               selectedOption: widget.selectedOption,
-              txHash: response['txHash'] ??
+              txHash:
+                  response['txHash'] ??
                   'mock_tx_${DateTime.now().millisecondsSinceEpoch}',
             ),
           ),
@@ -141,9 +140,7 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
         // Self-healing: treat as success to allow dashboard refresh
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(loc.translate('vote_already_recorded')),
-            ),
+            SnackBar(content: Text(loc.translate('vote_already_recorded'))),
           );
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
@@ -210,9 +207,7 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
                           const SizedBox(height: 12),
                           Text(
                             widget.selectedOption.text,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
+                            style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(context).primaryColor,
@@ -222,9 +217,7 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
                           const SizedBox(height: 8),
                           Text(
                             '${loc.translate('in_poll')} ${widget.poll.title}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
@@ -242,8 +235,8 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
                       child: Text(
                         _statusMessage,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).primaryColor,
-                            ),
+                          color: Theme.of(context).primaryColor,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -258,8 +251,9 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child:
-                                CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
                           )
                         : Text(loc.translate('confirm_vote')),
                   ),

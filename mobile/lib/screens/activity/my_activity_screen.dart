@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/activity_item.dart';
 import '../../services/interfaces/i_api_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
+import '../../services/localization_service.dart';
 import 'activity_detail_screen.dart';
 
 class MyActivityScreen extends StatefulWidget {
@@ -74,6 +76,7 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     return Column(
       children: [
         // Offline indicator
@@ -104,7 +107,7 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Search by title...',
+              hintText: loc.translate('search_by_title'),
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -120,12 +123,12 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
         ),
 
         // Content
-        Expanded(child: _buildContent()),
+        Expanded(child: _buildContent(loc)),
       ],
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(LocalizationService loc) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -140,14 +143,16 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
             Icon(Icons.history, size: 80, color: Colors.grey.shade600),
             const SizedBox(height: 16),
             Text(
-              'No activity yet',
+              loc.translate('no_activity'),
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(color: Colors.grey),
             ),
             const SizedBox(height: 8),
             Text(
-              'Your votes and survey submissions\nwill appear here.',
+              loc.translate(
+                'voting_history',
+              ), // Using existing key for description prefix
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -161,7 +166,7 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
     if (filtered.isEmpty) {
       return Center(
         child: Text(
-          'No results match your search.',
+          loc.translate('no_search_results'),
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -200,10 +205,9 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     final ended = item.hasEnded;
-    final typeLabel = item.type.isEmpty
-        ? ''
-        : item.type[0].toUpperCase() + item.type.substring(1);
+    final typeKey = item.type.toLowerCase();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -214,7 +218,7 @@ class _ActivityTile extends StatelessWidget {
         ),
         title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          '$typeLabel  •  ${_formatDate(item.votedAt)}${item.rewardAmount != null ? "  •  +${item.rewardAmount} ${item.rewardToken}" : ""}',
+          '${loc.translate(typeKey)}  •  ${_formatDate(item.votedAt)}${item.rewardAmount != null ? "  •  +${item.rewardAmount} ${item.rewardToken}" : ""}',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -228,7 +232,7 @@ class _ActivityTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            ended ? 'Ended' : 'Live',
+            ended ? loc.translate('ended') : loc.translate('live'),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,

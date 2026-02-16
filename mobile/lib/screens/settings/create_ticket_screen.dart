@@ -113,7 +113,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Ticket #${result['ticket']['ticketNumber']}',
+                          '${loc.translate('ticket_number')}${result['ticket']['ticketNumber']}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.facebookBlue,
@@ -146,8 +146,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('${loc.translate('failed_create_ticket')}: ${e.toString()}'),
+          content: Text(
+            '${loc.translate('failed_create_ticket')}: ${e.toString()}',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -175,10 +176,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                 // Category Selection
                 Text(
                   loc.translate('category'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: Colors.grey.shade400),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: Colors.grey.shade400),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -204,7 +204,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                               color: AppTheme.facebookBlue,
                             ),
                             const SizedBox(width: 12),
-                            Text(category.displayName),
+                            Text(
+                              loc.translate('ticket_category_${category.name}'),
+                            ),
                           ],
                         ),
                       );
@@ -222,10 +224,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                 // Priority Selection
                 Text(
                   loc.translate('priority'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: Colors.grey.shade400),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: Colors.grey.shade400),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -244,8 +245,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? _getPriorityColor(priority)
-                                      .withValues(alpha: 0.2)
+                                  ? _getPriorityColor(
+                                      priority,
+                                    ).withValues(alpha: 0.2)
                                   : AppTheme.darkSurface,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
@@ -266,7 +268,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  priority.displayName,
+                                  loc.translate(
+                                    'ticket_priority_${priority.name}',
+                                  ),
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: isSelected
@@ -291,10 +295,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                 // Subject Field
                 Text(
                   loc.translate('subject'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: Colors.grey.shade400),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: Colors.grey.shade400),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -327,10 +330,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                 // Message Field
                 Text(
                   loc.translate('message_label'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: Colors.grey.shade400),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: Colors.grey.shade400),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(

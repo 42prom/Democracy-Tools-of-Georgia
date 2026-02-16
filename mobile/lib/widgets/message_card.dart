@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/message.dart';
+import '../services/localization_service.dart';
 
 class MessageCard extends StatelessWidget {
   final Message message;
@@ -9,6 +11,7 @@ class MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     final theme = Theme.of(context);
     final isCritical = message.type == 'critical';
 
@@ -24,6 +27,14 @@ class MessageCard extends StatelessWidget {
       case 'announcement':
         iconData = Icons.campaign_rounded;
         accentColor = Colors.blueAccent;
+        break;
+      case 'alert':
+        iconData = Icons.notifications_active_rounded;
+        accentColor = Colors.orangeAccent;
+        break;
+      case 'reminder':
+        iconData = Icons.event_note_rounded;
+        accentColor = Colors.purpleAccent;
         break;
       default:
         iconData = Icons.info_outline_rounded;
@@ -131,7 +142,7 @@ class MessageCard extends StatelessWidget {
                             ),
                           if (message.publishedAt == null)
                             Text(
-                              'Just now',
+                              loc.translate('just_now'),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.grey.shade600,
                                 fontSize: 10,
@@ -150,7 +161,7 @@ class MessageCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                message.type.toUpperCase(),
+                                loc.translate('message_type_${message.type}'),
                                 style: TextStyle(
                                   color: accentColor.withValues(alpha: 0.8),
                                   fontSize: 9,

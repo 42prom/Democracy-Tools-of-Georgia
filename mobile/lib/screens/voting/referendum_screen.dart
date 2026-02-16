@@ -58,8 +58,8 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                   Text(
                     widget.poll.title,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 16),
 
@@ -67,14 +67,14 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .primaryColor
-                          .withValues(alpha: 0.08),
+                      color: Theme.of(
+                        context,
+                      ).primaryColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Theme.of(context)
-                            .primaryColor
-                            .withValues(alpha: 0.2),
+                        color: Theme.of(
+                          context,
+                        ).primaryColor.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -87,10 +87,8 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                         const SizedBox(height: 12),
                         Text(
                           widget.poll.description ?? widget.poll.title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -157,11 +155,7 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                                       ),
                                     ),
                                     if (isSelected)
-                                      Icon(
-                                        Icons.check,
-                                        color: color,
-                                        size: 24,
-                                      ),
+                                      Icon(Icons.check, color: color, size: 24),
                                   ],
                                 ),
                               ),
@@ -177,10 +171,10 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                     onPressed: _selectedOptionId == null
                         ? null
                         : () {
-                            final selectedOption =
-                                widget.poll.options.firstWhere(
-                              (opt) => opt.id == _selectedOptionId,
-                            );
+                            final selectedOption = widget.poll.options
+                                .firstWhere(
+                                  (opt) => opt.id == _selectedOptionId,
+                                );
 
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -207,9 +201,9 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                   // Info
                   Text(
                     loc.translate('vote_anonymous_warning'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),

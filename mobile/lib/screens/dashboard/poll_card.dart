@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/localization_service.dart';
 import '../../models/poll.dart';
 import '../voting/poll_details_screen.dart';
 import '../voting/survey_screen.dart';
@@ -12,6 +14,7 @@ class PollCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locService = Provider.of<LocalizationService>(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
@@ -38,7 +41,7 @@ class PollCard extends StatelessWidget {
                   child: Text(
                     poll.type.isEmpty
                         ? ''
-                        : poll.type[0].toUpperCase() + poll.type.substring(1),
+                        : locService.translate(poll.type.toLowerCase()),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -97,10 +100,10 @@ class PollCard extends StatelessWidget {
                 },
                 child: Text(
                   poll.isSurvey
-                      ? 'Take Survey'
+                      ? locService.translate('take_survey')
                       : poll.type == 'referendum'
-                      ? 'Vote on Referendum'
-                      : 'Vote Now',
+                      ? locService.translate('vote_on_referendum')
+                      : locService.translate('vote_now'),
                 ),
               ),
             ),

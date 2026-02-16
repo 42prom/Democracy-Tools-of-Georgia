@@ -14,6 +14,7 @@ import SettingsVerificationProviders from './pages/SettingsVerificationProviders
 import SettingsBlockchain from './pages/SettingsBlockchain';
 import SettingsSecurity from './pages/SettingsSecurity';
 import SettingsNotifications from './pages/SettingsNotifications';
+import SettingsGeoBlocking from './pages/SettingsGeoBlocking';
 import Dashboard from './pages/Dashboard';
 import SecurityLogs from './pages/SecurityLogs';
 import PollDetails from './pages/PollDetails';
@@ -77,6 +78,7 @@ function App() {
             <Route path="blockchain" element={<SettingsBlockchain />} />
             <Route path="security" element={<SettingsSecurity />} />
             <Route path="notifications" element={<SettingsNotifications />} />
+            <Route path="geo-blocking" element={<SettingsGeoBlocking />} />
           </Route>
         </Route>
 

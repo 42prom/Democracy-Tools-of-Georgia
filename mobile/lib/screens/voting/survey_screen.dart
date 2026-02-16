@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/activity_item.dart';
 import '../../models/poll.dart';
 import '../../services/interfaces/i_api_service.dart';
+import '../../services/localization_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
 import 'vote_receipt_screen.dart';
@@ -59,10 +61,11 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locService = Provider.of<LocalizationService>(context);
     if (_questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Survey')),
-        body: const Center(child: Text('This survey has no questions.')),
+        appBar: AppBar(title: Text(locService.translate('survey_title'))),
+        body: Center(child: Text(locService.translate('no_questions'))),
       );
     }
 
@@ -103,6 +106,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   }
 
   Widget _buildQuestionView() {
+    final locService = Provider.of<LocalizationService>(context);
     return Column(
       children: [
         // Progress bar
@@ -114,7 +118,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Question ${_currentQuestionIndex + 1} of ${_questions.length}',
+                    '${locService.translate('question_of')} ${_currentQuestionIndex + 1} ${locService.translate('of')} ${_questions.length}',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -172,7 +176,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      'Required',
+                      locService.translate('required'),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.red.shade300,
@@ -212,7 +216,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 52),
                     ),
-                    child: const Text('Back'),
+                    child: Text(locService.translate('back')),
                   ),
                 ),
               if (_currentQuestionIndex > 0) const SizedBox(width: 12),
@@ -225,7 +229,11 @@ class _SurveyScreenState extends State<SurveyScreen> {
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(0, 52),
                   ),
-                  child: Text(_isLastQuestion ? 'Submit Survey' : 'Next'),
+                  child: Text(
+                    _isLastQuestion
+                        ? locService.translate('submit_survey')
+                        : locService.translate('next'),
+                  ),
                 ),
               ),
             ],
@@ -324,6 +332,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   // --- Multiple Choice (Checkboxes) ---
   Widget _buildMultipleChoice() {
+    final locService = Provider.of<LocalizationService>(context);
     final selectedIds =
         _responses[_currentQuestion.id]?.selectedOptionIds ?? [];
 
@@ -331,7 +340,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select all that apply',
+          locService.translate('select_all_apply'),
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -411,11 +420,12 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   // --- Text Input ---
   Widget _buildTextInput() {
+    final locService = Provider.of<LocalizationService>(context);
     final maxLength =
         (_currentQuestion.config['maxLength'] as num?)?.toInt() ?? 500;
     final placeholder =
         _currentQuestion.config['placeholder'] as String? ??
-        'Type your answer...';
+        locService.translate('type_your_answer');
     final currentText = _responses[_currentQuestion.id]?.textResponse ?? '';
 
     return Column(
@@ -446,7 +456,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Your response is anonymous and will only be shown in aggregate.',
+          locService.translate('response_anonymous'),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Colors.grey,
             fontStyle: FontStyle.italic,
@@ -458,6 +468,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   // --- Rating Scale ---
   Widget _buildRatingScale() {
+    final locService = Provider.of<LocalizationService>(context);
     final config = _currentQuestion.config;
     final min = (config['min'] as num?)?.toInt() ?? 1;
     final max = (config['max'] as num?)?.toInt() ?? 5;
@@ -540,7 +551,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: Text(
-              'You selected: $currentValue',
+              '${locService.translate('you_selected')} $currentValue',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.w600,
@@ -553,6 +564,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
   // --- Ranked Choice (drag to reorder) ---
   Widget _buildRankedChoice() {
+    final locService = Provider.of<LocalizationService>(context);
     final rankedIds = _responses[_currentQuestion.id]?.rankedOptionIds ?? [];
     final maxRanks =
         (_currentQuestion.config['maxRanks'] as num?)?.toInt() ??
@@ -567,7 +579,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Tap options to rank them (up to $maxRanks)',
+          '${locService.translate('tap_to_rank')} (up to $maxRanks)',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -577,7 +589,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
         // Ranked items
         if (rankedIds.isNotEmpty) ...[
           Text(
-            'Your ranking:',
+            locService.translate('your_ranking'),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
@@ -651,7 +663,9 @@ class _SurveyScreenState extends State<SurveyScreen> {
         // Unranked items
         if (unrankedOptions.isNotEmpty && rankedIds.length < maxRanks) ...[
           Text(
-            rankedIds.isEmpty ? 'Available options:' : 'Tap to add:',
+            rankedIds.isEmpty
+                ? locService.translate('available_options')
+                : locService.translate('tap_to_add'),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
@@ -712,6 +726,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   }
 
   void _confirmSubmit() {
+    final locService = Provider.of<LocalizationService>(context, listen: false);
     // Check all required questions are answered
     final unanswered = <int>[];
     for (int i = 0; i < _questions.length; i++) {
@@ -727,7 +742,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Please answer required question${unanswered.length > 1 ? 's' : ''}: ${unanswered.join(', ')}',
+            '${locService.translate('please_answer_required')} ${unanswered.join(', ')}',
           ),
         ),
       );
@@ -739,37 +754,37 @@ class _SurveyScreenState extends State<SurveyScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Submit Survey'),
+        title: Text(locService.translate('submit_survey')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'You have answered ${_responses.length} of ${_questions.length} questions.',
+              '${locService.translate('answered_questions')} ${_responses.length} ${locService.translate('of')} ${_questions.length} ${locService.translate('questions')}',
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Your responses are anonymous and cannot be traced back to you.',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+            Text(
+              locService.translate('responses_anonymous'),
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Once submitted, you cannot change your answers.',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+            Text(
+              locService.translate('cannot_change_answers'),
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Review'),
+            child: Text(locService.translate('review')),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _submitSurvey();
             },
-            child: const Text('Submit'),
+            child: Text(locService.translate('submit')),
           ),
         ],
       ),
@@ -800,22 +815,25 @@ class _SurveyScreenState extends State<SurveyScreen> {
   }
 
   Future<void> _submitSurvey() async {
+    final locService = Provider.of<LocalizationService>(context, listen: false);
     final IApiService apiService = ServiceLocator.apiService;
     final StorageService storageService = StorageService();
     setState(() {
       _submitting = true;
-      _statusMessage = 'Requesting challenge...';
+      _statusMessage = locService.translate('requesting_challenge');
     });
 
     try {
       // Step 1: Challenge nonce
       setState(
-        () => _statusMessage = 'Step 1/4: Requesting challenge nonce...',
+        () => _statusMessage = locService.translate('step_1_4_challenge'),
       );
       final challengeResponse = await apiService.requestChallenge();
       final String nonce = challengeResponse['nonce'];
       // Step 2: Issue attestation
-      setState(() => _statusMessage = 'Step 2/4: Issuing attestation...');
+      setState(
+        () => _statusMessage = locService.translate('step_2_4_attestation'),
+      );
       final timestampBucket = DateTime.now().millisecondsSinceEpoch ~/ 60000;
 
       final attestationResponse = await apiService.issueAttestation(
@@ -827,13 +845,17 @@ class _SurveyScreenState extends State<SurveyScreen> {
       final String attestation = attestationResponse['attestation'];
 
       // Step 3: Compute nullifier
-      setState(() => _statusMessage = 'Step 3/4: Computing nullifier...');
+      setState(
+        () => _statusMessage = locService.translate('step_3_4_nullifier'),
+      );
       final String nullifier = await storageService.computeNullifier(
         widget.poll.id,
       );
 
       // Step 4: Submit survey responses
-      setState(() => _statusMessage = 'Step 4/4: Submitting survey...');
+      setState(
+        () => _statusMessage = locService.translate('step_4_4_submitting'),
+      );
       final responsesList = _responses.values.map((r) => r.toJson()).toList();
 
       final result = await apiService.submitSurvey(
@@ -873,7 +895,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
               poll: widget.poll,
               selectedOption: PollOption(
                 id: 'survey',
-                text: 'Survey Responses',
+                text: locService.translate('survey_responses'),
                 displayOrder: 0,
               ),
               txHash: result['txHash'] ?? 'mock_survey_tx',
@@ -887,8 +909,8 @@ class _SurveyScreenState extends State<SurveyScreen> {
         // Self-healing: treat as success to allow dashboard refresh
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Survey already submitted. Refreshing...'),
+            SnackBar(
+              content: Text(locService.translate('survey_already_submitted')),
             ),
           );
           Navigator.of(context).popUntil((route) => route.isFirst);
@@ -898,32 +920,38 @@ class _SurveyScreenState extends State<SurveyScreen> {
 
       setState(() => _submitting = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to submit survey: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${locService.translate('failed_submit_survey')}: $e',
+            ),
+          ),
+        );
       }
     }
   }
 
   void _showExitDialog() {
+    final locService = Provider.of<LocalizationService>(context, listen: false);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Leave Survey?'),
-        content: const Text(
-          'Your progress will be lost. Are you sure you want to leave?',
-        ),
+        title: Text(locService.translate('leave_survey')),
+        content: Text(locService.translate('progress_lost')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Stay'),
+            child: Text(locService.translate('stay')),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context); // close dialog
               Navigator.pop(context); // go back
             },
-            child: const Text('Leave', style: TextStyle(color: Colors.red)),
+            child: Text(
+              locService.translate('leave'),
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -931,17 +959,18 @@ class _SurveyScreenState extends State<SurveyScreen> {
   }
 
   String _formatQuestionType(String type) {
+    final locService = Provider.of<LocalizationService>(context, listen: false);
     switch (type) {
       case 'single_choice':
-        return 'Single Choice';
+        return locService.translate('single_choice');
       case 'multiple_choice':
-        return 'Multiple Choice';
+        return locService.translate('multiple_choice');
       case 'text':
-        return 'Text Response';
+        return locService.translate('text_response');
       case 'rating_scale':
-        return 'Rating Scale';
+        return locService.translate('rating_scale');
       case 'ranked_choice':
-        return 'Ranked Choice';
+        return locService.translate('ranked_choice');
       default:
         return type;
     }
@@ -965,6 +994,7 @@ class SurveyReceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locService = Provider.of<LocalizationService>(context);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -981,7 +1011,7 @@ class SurveyReceiptScreen extends StatelessWidget {
 
               // Success Message
               Text(
-                'Survey Submitted!',
+                locService.translate('survey_submitted'),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -996,16 +1026,20 @@ class SurveyReceiptScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildRow('Survey', poll.title, context),
-                      const Divider(height: 24),
                       _buildRow(
-                        'Questions Answered',
-                        '$questionsAnswered of $totalQuestions',
+                        locService.translate('survey'),
+                        poll.title,
                         context,
                       ),
                       const Divider(height: 24),
                       _buildRow(
-                        'Transaction Hash',
+                        locService.translate('questions_answered'),
+                        '$questionsAnswered ${locService.translate('of')} $totalQuestions',
+                        context,
+                      ),
+                      const Divider(height: 24),
+                      _buildRow(
+                        locService.translate('transaction_hash'),
                         txHash,
                         context,
                         mono: true,
@@ -1017,7 +1051,7 @@ class SurveyReceiptScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
               Text(
-                'Your responses are anonymous and protected by our privacy system.',
+                locService.translate('responses_protected'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey,
                   fontStyle: FontStyle.italic,
@@ -1035,7 +1069,7 @@ class SurveyReceiptScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
                 ),
-                child: const Text('Back to Home'),
+                child: Text(locService.translate('back_to_home')),
               ),
               const SizedBox(height: 24),
             ],

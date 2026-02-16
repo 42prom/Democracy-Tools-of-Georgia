@@ -25,7 +25,8 @@ class Poll {
     this.rewardToken,
   });
 
-  bool get isSurvey => type == 'survey' && questions != null && questions!.isNotEmpty;
+  bool get isSurvey =>
+      type == 'survey' && questions != null && questions!.isNotEmpty;
 
   factory Poll.fromJson(Map<String, dynamic> json) {
     List<SurveyQuestion>? questions;
@@ -49,8 +50,8 @@ class Poll {
       rewardsEnabled: json['rewards_enabled'] ?? false,
       rewardAmount: json['reward_amount'] != null
           ? (json['reward_amount'] is String
-              ? double.tryParse(json['reward_amount'])
-              : (json['reward_amount'] as num).toDouble())
+                ? double.tryParse(json['reward_amount'])
+                : (json['reward_amount'] as num).toDouble())
           : null,
       rewardToken: json['reward_token'] ?? 'DTG',
     );
@@ -82,7 +83,8 @@ class PollOption {
 class SurveyQuestion {
   final String id;
   final String questionText;
-  final String questionType; // single_choice, multiple_choice, text, rating_scale, ranked_choice
+  final String
+  questionType; // single_choice, multiple_choice, text, rating_scale, ranked_choice
   final bool required;
   final int displayOrder;
   final Map<String, dynamic> config;
@@ -99,7 +101,8 @@ class SurveyQuestion {
   });
 
   factory SurveyQuestion.fromJson(Map<String, dynamic> json) {
-    final displayOrderValue = json['displayOrder'] ?? json['display_order'] ?? 0;
+    final displayOrderValue =
+        json['displayOrder'] ?? json['display_order'] ?? 0;
     return SurveyQuestion(
       id: json['id'],
       questionText: json['questionText'] ?? json['question_text'],
@@ -128,7 +131,8 @@ class QuestionOption {
   });
 
   factory QuestionOption.fromJson(Map<String, dynamic> json) {
-    final displayOrderValue = json['displayOrder'] ?? json['display_order'] ?? 0;
+    final displayOrderValue =
+        json['displayOrder'] ?? json['display_order'] ?? 0;
     return QuestionOption(
       id: json['id'],
       optionText: json['optionText'] ?? json['option_text'],
@@ -144,10 +148,7 @@ class SurveyResponsePayload {
   final String pollId;
   final List<QuestionResponseData> responses;
 
-  SurveyResponsePayload({
-    required this.pollId,
-    required this.responses,
-  });
+  SurveyResponsePayload({required this.pollId, required this.responses});
 
   Map<String, dynamic> toJson() {
     return {

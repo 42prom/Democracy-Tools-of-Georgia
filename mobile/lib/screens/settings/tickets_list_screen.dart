@@ -124,11 +124,7 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 80,
-                color: Colors.grey.shade600,
-              ),
+              Icon(Icons.inbox_outlined, size: 80, color: Colors.grey.shade600),
               const SizedBox(height: 16),
               Text(
                 loc.translate('no_tickets_yet'),
@@ -233,22 +229,23 @@ class _TicketCard extends StatelessWidget {
                 children: [
                   _InfoChip(
                     icon: _getCategoryIcon(ticket.category),
-                    label: ticket.category.displayName,
+                    label: loc.translate(
+                      'ticket_category_${ticket.category.name}',
+                    ),
                     color: AppTheme.facebookBlue,
                   ),
                   const SizedBox(width: 8),
                   _InfoChip(
                     icon: _getPriorityIcon(ticket.priority),
-                    label: ticket.priority.displayName,
+                    label: loc.translate(
+                      'ticket_priority_${ticket.priority.name}',
+                    ),
                     color: _getPriorityColor(ticket.priority),
                   ),
                   const Spacer(),
                   Text(
                     _formatDate(ticket.createdAt),
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                   ),
                 ],
               ),
@@ -310,13 +307,13 @@ class _TicketCard extends StatelessWidget {
 
     if (diff.inDays == 0) {
       if (diff.inHours == 0) {
-        return '${diff.inMinutes}m ago';
+        return '${diff.inMinutes}${loc.translate('m_ago')}';
       }
-      return '${diff.inHours}h ago';
+      return '${diff.inHours}${loc.translate('h_ago')}';
     } else if (diff.inDays == 1) {
       return loc.translate('yesterday');
     } else if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
+      return '${diff.inDays}${loc.translate('d_ago')}';
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
@@ -349,6 +346,7 @@ class _StatusBadge extends StatelessWidget {
         break;
     }
 
+    final loc = Provider.of<LocalizationService>(context, listen: false);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -357,7 +355,7 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
-        status.displayName,
+        loc.translate('ticket_status_${status.name}'),
         style: TextStyle(
           color: color,
           fontSize: 11,

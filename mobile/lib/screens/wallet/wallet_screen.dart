@@ -147,7 +147,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                   if (_transactions.isNotEmpty)
                     Text(
-                      '${_transactions.length} total',
+                      '${_transactions.length} ${locService.translate('total')}',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -180,7 +180,9 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 )
               else
-                ..._transactions.map((tx) => _buildTransactionTile(tx)),
+                ..._transactions.map(
+                  (tx) => _buildTransactionTile(tx, locService),
+                ),
             ],
           ),
         ),
@@ -204,7 +206,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildTransactionTile(Transaction tx) {
+  Widget _buildTransactionTile(Transaction tx, LocalizationService locService) {
     final dateFormat = DateFormat('dd-MM-yyyy, HH:mm');
 
     return Card(
@@ -233,7 +235,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ),
         subtitle: Text(
-          '${tx.type == TransactionType.send ? 'To' : 'From'}: ${tx.address.length > 10 ? "${tx.address.substring(0, 10)}..." : tx.address}\n${dateFormat.format(tx.timestamp)}',
+          '${tx.type == TransactionType.send ? locService.translate('to') : locService.translate('from')}: ${tx.address.length > 10 ? "${tx.address.substring(0, 10)}..." : tx.address}\n${dateFormat.format(tx.timestamp)}',
         ),
         trailing: _buildStatusBadge(tx.status),
         onTap: () {
@@ -251,18 +253,19 @@ class _WalletScreenState extends State<WalletScreen> {
     Color color;
     String text;
 
+    final loc = Provider.of<LocalizationService>(context, listen: false);
     switch (status) {
       case TransactionStatus.confirmed:
         color = Colors.green;
-        text = 'Confirmed';
+        text = loc.translate('confirmed');
         break;
       case TransactionStatus.pending:
         color = Colors.orange;
-        text = 'Pending';
+        text = loc.translate('pending');
         break;
       case TransactionStatus.failed:
         color = Colors.red;
-        text = 'Failed';
+        text = loc.translate('failed');
         break;
     }
 

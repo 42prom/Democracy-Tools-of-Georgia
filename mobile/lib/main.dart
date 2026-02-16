@@ -46,7 +46,9 @@ void main() async {
   // Initialize localization service
   final localizationService = LocalizationService();
   await localizationService.initialize();
-  debugPrint('✅ Localization initialized: ${localizationService.currentLanguage.displayName}');
+  debugPrint(
+    '✅ Localization initialized: ${localizationService.currentLanguage.displayName}',
+  );
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -187,16 +189,21 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 24),
             Text(
               locService.translate('app_name'),
+              textAlign: TextAlign.center,
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              locService.translate('app_subtitle'),
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Text(
+                locService.translate('app_subtitle'),
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+              ),
             ),
             const SizedBox(height: 40),
             const CircularProgressIndicator(),

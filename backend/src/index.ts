@@ -29,6 +29,7 @@ import adminExportRouter from './routes/admin/export';
 import adminMessagesRouter from './routes/admin/messages';
 import adminSecurityRouter from './routes/admin/security';
 import adminTicketsRouter from './routes/admin/tickets';
+import adminGeoBlockingRouter from './routes/admin/geoBlocking';
 import statsRouter from './routes/stats';
 import ticketsRouter from './routes/tickets';
 
@@ -101,6 +102,7 @@ app.use('/api/v1/admin/export', adminExportRouter);
 app.use('/api/v1/admin/messages', adminMessagesRouter);
 app.use('/api/v1/admin/security-events', adminSecurityRouter);
 app.use('/api/v1/admin/tickets', adminTicketsRouter);
+app.use('/api/v1/admin/geo-blocking', adminGeoBlockingRouter);
 app.use('/api/v1/stats', statsRouter);
 app.use('/api/v1/tickets', ticketsRouter);
 app.use('/api/v1/analytics', statsRouter); // Analytics endpoint (alias for stats)

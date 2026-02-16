@@ -146,7 +146,7 @@ class LivenessController extends ChangeNotifier {
     _nfcPortraitBase64 = nfcPortrait;
     _livenessNonce = livenessNonce;
     _state = LivenessState.lookingForFace;
-    _feedbackMessage = "Center your face in the frame";
+    _feedbackMessage = "center_face";
     _blinkDetected = false;
     _headTurnDetected = false;
     notifyListeners();
@@ -171,8 +171,7 @@ class LivenessController extends ChangeNotifier {
       if (_consecutiveNullFrames >= _nullFrameTolerance * 5) {
         // 15 frames tolerance
         _currentFace = null;
-        // DON'T reset stableSince - allow timer to continue
-        // DON'T change message - let current instruction stay visible
+        _feedbackMessage = "face_lost";
         notifyListeners();
       }
       // Even without face, check timers should proceed
@@ -198,8 +197,8 @@ class LivenessController extends ChangeNotifier {
     _currentFace = face;
 
     // Clear "Face lost" error if we re-acquired it
-    if (_feedbackMessage?.contains("Face lost") == true) {
-      _feedbackMessage = "Face detected";
+    if (_feedbackMessage == "face_lost") {
+      _feedbackMessage = "face_detected";
     }
 
     _evaluateState(face);
@@ -276,7 +275,7 @@ class LivenessController extends ChangeNotifier {
         if (normalized != null) {
           _feedbackMessage = _guidanceFromNormalized(normalized, idle: true);
         } else {
-          _feedbackMessage = "Center your face in the frame";
+          _feedbackMessage = "center_face";
         }
         break;
 
@@ -315,18 +314,18 @@ class LivenessController extends ChangeNotifier {
         final dx = result.centerX - _ovalCenterX;
         final dy = result.centerY - _ovalCenterY;
         if (dx.abs() > dy.abs()) {
-          return dx > 0 ? "Move LEFT ←" : "Move RIGHT →";
+          return dx > 0 ? "move_left" : "move_right";
         } else {
-          return dy > 0 ? "Move UP ↑" : "Move DOWN ↓";
+          return dy > 0 ? "move_up" : "move_down";
         }
       case FaceDecision.tooSmall:
-        return "Move closer";
+        return "move_closer";
       case FaceDecision.tooBig:
-        return "Move back";
+        return "move_back";
       case FaceDecision.lowLight:
-        return "More light needed";
+        return "more_light";
       case FaceDecision.ok:
-        return idle ? "Hold steady..." : null;
+        return idle ? "hold_steady" : null;
     }
   }
 
@@ -341,7 +340,7 @@ class LivenessController extends ChangeNotifier {
     HapticFeedback.mediumImpact();
     _state = LivenessState.stableCheck;
     _stableSince = DateTime.now();
-    _feedbackMessage = "Hold still...";
+    _feedbackMessage = "hold_still";
     notifyListeners();
   }
 
@@ -386,16 +385,16 @@ class LivenessController extends ChangeNotifier {
 
     switch (_currentChallenge) {
       case LivenessChallenge.blink:
-        _feedbackMessage = "👁️ Blink your eyes";
+        _feedbackMessage = "blink_eyes";
         break;
       case LivenessChallenge.turnHeadLeft:
-        _feedbackMessage = "← Turn head LEFT";
+        _feedbackMessage = "turn_head_left";
         break;
       case LivenessChallenge.turnHeadRight:
-        _feedbackMessage = "Turn head RIGHT →";
+        _feedbackMessage = "turn_head_right";
         break;
       default:
-        _feedbackMessage = "Follow instructions";
+        _feedbackMessage = "follow_instructions";
     }
   }
 
@@ -443,8 +442,8 @@ class LivenessController extends ChangeNotifier {
       if (elapsed > 3000 &&
           _currentChallenge == LivenessChallenge.blink &&
           !_blinkDetected) {
-        if (_feedbackMessage == "👁️ Blink your eyes") {
-          _feedbackMessage = "Blink not detected — try better lighting";
+        if (_feedbackMessage == "blink_eyes") {
+          _feedbackMessage = "blink_not_detected";
           notifyListeners();
         }
       }
@@ -454,7 +453,7 @@ class LivenessController extends ChangeNotifier {
         HapticFeedback.heavyImpact();
         // FORCE failure state per security requirements
         _state = LivenessState.failed;
-        _feedbackMessage = "Challenge timed out. Please try again.";
+        _feedbackMessage = "challenge_timeout";
         notifyListeners();
         return;
       }
@@ -550,7 +549,7 @@ class LivenessController extends ChangeNotifier {
 
   Future<void> _startVerification() async {
     _state = LivenessState.verifying;
-    _feedbackMessage = "Verifying identity...";
+    _feedbackMessage = "verifying_identity";
     notifyListeners();
   }
 
@@ -581,7 +580,7 @@ class LivenessController extends ChangeNotifier {
     }
 
     _state = LivenessState.lookingForFace;
-    _feedbackMessage = "Center your face in the frame";
+    _feedbackMessage = "center_face";
     _currentFace = null;
     _stableSince = null;
     _smoother.clear(); // Important: clear old smoothing data
@@ -601,7 +600,7 @@ class LivenessController extends ChangeNotifier {
     String base64Image,
   ) async {
     _liveImageBase64 = base64Image;
-    _feedbackMessage = "Matching with your ID photo...";
+    _feedbackMessage = "matching_id_photo";
     notifyListeners();
 
     try {
@@ -626,7 +625,7 @@ class LivenessController extends ChangeNotifier {
         'livenessData': livenessData.toJson(),
       });
       _state = LivenessState.success;
-      _feedbackMessage = "✓ Identity Verified";
+      _feedbackMessage = "identity_verified";
       HapticFeedback.heavyImpact();
       notifyListeners();
       return _finalizeResponse;
@@ -650,27 +649,24 @@ class LivenessController extends ChangeNotifier {
       // Map long backend errors to short, nice UI messages
       if (errorMsg.toLowerCase().contains("score too low") ||
           errorMsg.toLowerCase().contains("face match")) {
-        _feedbackMessage = "Face Mismatch";
+        _feedbackMessage = "face_mismatch";
       } else if (errorMsg.toLowerCase().contains("marginal")) {
-        _feedbackMessage = "Poor Lighting";
+        _feedbackMessage =
+            "more_light"; // Using more_light as proxy for poor lighting
       } else if (errorMsg.toLowerCase().contains("ip blocked") ||
           errorMsg.toLowerCase().contains("rate limit")) {
-        _feedbackMessage = "Access Suspended";
+        _feedbackMessage = "access_suspended";
       } else if (errorMsg.toLowerCase().contains("nonce")) {
-        _feedbackMessage = "Session Expired";
+        _feedbackMessage = "session_expired";
       } else if (errorMsg.toLowerCase().contains("liveness check failed")) {
-        _feedbackMessage = "Match Failed";
+        _feedbackMessage = "match_failed";
       } else {
-        _feedbackMessage = "Verification Failed";
+        _feedbackMessage = "verification_failed";
       }
 
       // Final check for exhaustion overrides other messages
       if (_attemptsLeft == 0) {
-        _feedbackMessage = "Maximum attempts exhausted";
-      } else {
-        _feedbackMessage = _feedbackMessage?.isEmpty == true
-            ? errorMsg
-            : _feedbackMessage;
+        _feedbackMessage = "max_attempts_exhausted";
       }
 
       notifyListeners();

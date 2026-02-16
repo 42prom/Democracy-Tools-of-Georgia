@@ -222,11 +222,20 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                           const SizedBox(height: 24),
 
                           // Read-only fields
-                          _buildReadOnlyField(loc.translate('first_name'), _nameController),
+                          _buildReadOnlyField(
+                            loc.translate('first_name'),
+                            _nameController,
+                          ),
                           const SizedBox(height: 16),
-                          _buildReadOnlyField(loc.translate('last_name'), _surnameController),
+                          _buildReadOnlyField(
+                            loc.translate('last_name'),
+                            _surnameController,
+                          ),
                           const SizedBox(height: 16),
-                          _buildReadOnlyField(loc.translate('birth_date'), _dobController),
+                          _buildReadOnlyField(
+                            loc.translate('birth_date'),
+                            _dobController,
+                          ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -238,7 +247,10 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: _buildReadOnlyField(loc.translate('age'), _ageController),
+                                child: _buildReadOnlyField(
+                                  loc.translate('age'),
+                                  _ageController,
+                                ),
                               ),
                             ],
                           ),
@@ -270,15 +282,19 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                   ),
                                   filled: true,
                                 ),
-                                validator: (v) =>
-                                    v == null || v.isEmpty ? loc.translate('required') : null,
+                                validator: (v) => v == null || v.isEmpty
+                                    ? loc.translate('required')
+                                    : null,
                               ),
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             loc.translate('select_region_help'),
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
                           ),
                         ],
                       ),

@@ -90,10 +90,11 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
     });
 
     try {
+      final loc = Provider.of<LocalizationService>(context, listen: false);
       // 1. Poll for tag
       await FlutterNfcKit.poll(
         timeout: const Duration(seconds: 20),
-        iosAlertMessage: "Hold your phone near the document's NFC chip",
+        iosAlertMessage: loc.translate('hold_phone_near_chip'),
         readIso14443A: true,
         readIso14443B: true,
       );
@@ -156,7 +157,7 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
         base64Image = base64Encode(imageBytes);
       }
 
-      await FlutterNfcKit.finish(iosAlertMessage: "Success!");
+      await FlutterNfcKit.finish(iosAlertMessage: loc.translate('success'));
 
       // 6. Submit using CHIP data
       await _submitData(
@@ -165,15 +166,19 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
         chipPn: chipPersonalNumber,
       );
     } on PlatformException catch (e) {
-      await FlutterNfcKit.finish(iosErrorMessage: "Scan failed");
+      if (!mounted) return;
+      final loc = Provider.of<LocalizationService>(context, listen: false);
+      await FlutterNfcKit.finish(
+        iosErrorMessage: loc.translate('nfc_scan_failed'),
+      );
       if (!mounted) return;
 
-      String cleanError = "Scan failed. Please try again.";
+      String cleanError = loc.translate('scan_failed_retry');
       if (e.message?.contains("Communication error") == true ||
           e.code == "500") {
-        cleanError = "Lost connection to chip. Please hold the phone steadily.";
+        cleanError = loc.translate('lost_connection_chip');
       } else if (e.message?.contains("Tag was lost") == true) {
-        cleanError = "Tag lost. Please hold still.";
+        cleanError = loc.translate('tag_lost');
       } else {
         cleanError = e.message ?? cleanError;
       }
@@ -185,20 +190,23 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
 
       DTGErrorDialog.show(
         context,
-        title: 'NFC Scan Failed',
+        title: loc.translate('nfc_scan_failed'),
         message: cleanError,
         icon: Icons.contactless_outlined,
       );
     } catch (e) {
-      await FlutterNfcKit.finish(iosErrorMessage: "Scan failed");
+      if (!mounted) return;
+      final loc = Provider.of<LocalizationService>(context, listen: false);
+      await FlutterNfcKit.finish(
+        iosErrorMessage: loc.translate('nfc_scan_failed'),
+      );
       if (!mounted) return;
 
       String msg = e.toString().replaceAll('Exception:', '').trim();
       bool isAccessDenied = msg.contains("Access Denied");
 
       if (isAccessDenied) {
-        msg =
-            "Unable to unlock chip. The MRZ data (Doc Number, DOB, Expiry) must match exactly.";
+        msg = loc.translate('access_denied_mrz');
       }
 
       setState(() {
@@ -209,10 +217,14 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
 
       DTGErrorDialog.show(
         context,
-        title: isAccessDenied ? 'Authentication Failed' : 'NFC Error',
+        title: isAccessDenied
+            ? loc.translate('auth_failed')
+            : loc.translate('nfc_error'),
         message: msg,
         icon: isAccessDenied ? Icons.lock_outline : Icons.error_outline,
-        buttonText: isAccessDenied ? 'Check Data' : 'Try Again',
+        buttonText: isAccessDenied
+            ? loc.translate('check_data')
+            : loc.translate('try_again'),
       );
 
       if (isAccessDenied) {
@@ -271,8 +283,10 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
 
     if (widget.policy.nfc.requirePersonalNumber && effectivePn.isEmpty) {
       final pn = await _promptForPersonalNumber();
+      if (!mounted) return;
       if (pn == null || pn.isEmpty) {
-        throw Exception("Personal Number is required.");
+        final loc = Provider.of<LocalizationService>(context, listen: false);
+        throw Exception(loc.translate('personal_number_required'));
       }
       effectivePn = pn;
     }
@@ -359,24 +373,23 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
   }
 
   Future<String?> _promptForPersonalNumber() async {
+    final loc = Provider.of<LocalizationService>(context, listen: false);
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Missing Personal Number'),
+        title: Text(loc.translate('missing_personal_number')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'The Personal Number was not found on the document scan. Please enter it manually to continue.',
-            ),
+            Text(loc.translate('personal_number_not_found')),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Personal Number',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: loc.translate('personal_number'),
+                border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.text, // Alphanumeric allowed?
             ),
@@ -385,11 +398,11 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(loc.translate('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Confirm'),
+            child: Text(loc.translate('confirm')),
           ),
         ],
       ),
@@ -408,42 +421,45 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
     );
     final natController = TextEditingController(text: _currentMrz.nationality);
 
+    final loc = Provider.of<LocalizationService>(context, listen: false);
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit MRZ Data'),
+        title: Text(loc.translate('edit_mrz_data')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Correct these values to match your physical document EXACTLY. They are keys to unlock the chip.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+              Text(
+                loc.translate('correct_mrz_values'),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: docController,
-                decoration: const InputDecoration(labelText: 'Document Number'),
+                decoration: InputDecoration(
+                  labelText: loc.translate('doc_num_label'),
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: dobController,
-                decoration: const InputDecoration(
-                  labelText: 'Date of Birth (DD-MM-YYYY)',
+                decoration: InputDecoration(
+                  labelText: loc.translate('dob_format'),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: expController,
-                decoration: const InputDecoration(
-                  labelText: 'Expiry Date (DD-MM-YYYY)',
+                decoration: InputDecoration(
+                  labelText: loc.translate('expiry_format'),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: natController,
-                decoration: const InputDecoration(
-                  labelText: 'Nationality (e.g. GEO)',
+                decoration: InputDecoration(
+                  labelText: loc.translate('nationality_format'),
                 ),
                 maxLength: 3,
               ),
@@ -453,7 +469,7 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(loc.translate('cancel')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -478,13 +494,11 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                 Navigator.pop(ctx);
               } catch (e) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Invalid format. Use DD-MM-YYYY for dates.'),
-                  ),
+                  SnackBar(content: Text(loc.translate('invalid_date_format'))),
                 );
               }
             },
-            child: const Text('Save & Retry'),
+            child: Text(loc.translate('save_retry_btn')),
           ),
         ],
       ),
@@ -533,7 +547,9 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text('${loc.translate('doc_num_label')}: ${_currentMrz.documentNumber}'),
+                        Text(
+                          '${loc.translate('doc_num_label')}: ${_currentMrz.documentNumber}',
+                        ),
                         Text(
                           '${loc.translate('date_of_birth')}: ${_dateFormat.format(_currentMrz.birthDate)}',
                         ),
@@ -551,7 +567,10 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                     child: Hero(
                       tag: 'nfcToFaceHero',
                       createRectTween: (begin, end) {
-                        return MaterialRectCenterArcTween(begin: begin, end: end);
+                        return MaterialRectCenterArcTween(
+                          begin: begin,
+                          end: end,
+                        );
                       },
                       child: Container(
                         width: double.infinity,
@@ -580,18 +599,19 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                                       'assets/lottie/nfc_tap_guide.json',
                                       animate: true,
                                       repeat: true,
-                                      frameBuilder: (context, child, composition) {
-                                        if (composition == null) {
-                                          return Icon(
-                                            Icons.nfc_rounded,
-                                            size: 80,
-                                            color: cs.onSurface.withValues(
-                                              alpha: 0.2,
-                                            ),
-                                          );
-                                        }
-                                        return child;
-                                      },
+                                      frameBuilder:
+                                          (context, child, composition) {
+                                            if (composition == null) {
+                                              return Icon(
+                                                Icons.nfc_rounded,
+                                                size: 80,
+                                                color: cs.onSurface.withValues(
+                                                  alpha: 0.2,
+                                                ),
+                                              );
+                                            }
+                                            return child;
+                                          },
                                     ),
                                   ),
 
@@ -651,7 +671,9 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                                       child: Text(
                                         _mode == 'login'
                                             ? loc.translate('welcome_back')
-                                            : loc.translate('registration_started'),
+                                            : loc.translate(
+                                                'registration_started',
+                                              ),
                                         style: TextStyle(
                                           color: Colors.green.shade900,
                                           fontWeight: FontWeight.bold,
@@ -686,7 +708,10 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red),
+                              const Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -729,7 +754,9 @@ class _NfcScanScreenState extends State<NfcScanScreen> {
                     label: Text(
                       _submitting
                           ? loc.translate('validating')
-                          : (_scanning ? loc.translate('scanning') : loc.translate('start_nfc_scan')),
+                          : (_scanning
+                                ? loc.translate('scanning')
+                                : loc.translate('start_nfc_scan')),
                     ),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 56),

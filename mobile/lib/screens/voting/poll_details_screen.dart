@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/localization_service.dart';
 import '../../models/poll.dart';
 import 'confirm_vote_screen.dart';
 import 'survey_screen.dart';
@@ -43,8 +45,9 @@ class _PollDetailsScreenState extends State<PollDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Poll Details')),
+      appBar: AppBar(title: Text(loc.translate('poll_details'))),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -163,7 +166,7 @@ class _PollDetailsScreenState extends State<PollDetailsScreen> {
                             ),
                           );
                         },
-                  child: const Text('Review Vote'),
+                  child: Text(loc.translate('review_vote')),
                 ),
               ),
             ],

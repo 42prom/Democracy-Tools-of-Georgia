@@ -81,7 +81,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_messages.isEmpty) {
           final loc = Provider.of<LocalizationService>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${loc.translate('failed_load_messages')}: $e')),
+            SnackBar(
+              content: Text('${loc.translate('failed_load_messages')}: $e'),
+            ),
           );
         }
       }
@@ -153,9 +155,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() => _loading = false);
       if (mounted) {
         final loc = Provider.of<LocalizationService>(context, listen: false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${loc.translate('failed_load_polls')}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.translate('failed_load_polls')}: $e')),
+        );
       }
     }
   }
@@ -312,7 +314,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const Icon(Icons.message_outlined, size: 80, color: Colors.grey),
             const SizedBox(height: 24),
-            Text(loc.translate('no_recent_updates'), style: const TextStyle(color: Colors.grey)),
+            Text(
+              loc.translate('no_recent_updates'),
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -445,7 +450,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _displayName.isNotEmpty ? _displayName : loc.translate('citizen_user'),
+                          _displayName.isNotEmpty
+                              ? _displayName
+                              : loc.translate('citizen_user'),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),
@@ -534,41 +541,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       showDialog(
                         context: context,
-                        builder: (dialogContext) => Consumer<LocalizationService>(
-                          builder: (context, dialogLoc, child) => AlertDialog(
-                            title: Text(dialogLoc.translate('logout')),
-                            content: Text(dialogLoc.translate('logout_confirm')),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: Text(dialogLoc.translate('cancel')),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  final navigator = Navigator.of(context);
-                                  Navigator.pop(dialogContext); // Close dialog
-
-                                  // Clear all data
-                                  await _storageService.clearAll();
-
-                                  if (mounted) {
-                                    // Navigate to Intro Screen (Login)
-                                    navigator.pushAndRemoveUntil(
-                                      MaterialPageRoute(
-                                        builder: (context) => const IntroScreen(),
+                        builder: (dialogContext) =>
+                            Consumer<LocalizationService>(
+                              builder: (context, dialogLoc, child) =>
+                                  AlertDialog(
+                                    title: Text(dialogLoc.translate('logout')),
+                                    content: Text(
+                                      dialogLoc.translate('logout_confirm'),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogContext),
+                                        child: Text(
+                                          dialogLoc.translate('cancel'),
+                                        ),
                                       ),
-                                      (route) => false,
-                                    );
-                                  }
-                                },
-                                child: Text(
-                                  dialogLoc.translate('logout'),
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                                      TextButton(
+                                        onPressed: () async {
+                                          final navigator = Navigator.of(
+                                            context,
+                                          );
+                                          Navigator.pop(
+                                            dialogContext,
+                                          ); // Close dialog
+
+                                          // Clear all data
+                                          await _storageService.clearAll();
+
+                                          if (mounted) {
+                                            // Navigate to Intro Screen (Login)
+                                            navigator.pushAndRemoveUntil(
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const IntroScreen(),
+                                              ),
+                                              (route) => false,
+                                            );
+                                          }
+                                        },
+                                        child: Text(
+                                          dialogLoc.translate('logout'),
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            ),
                       );
                     },
                   ),

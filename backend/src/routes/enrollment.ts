@@ -972,7 +972,10 @@ router.post('/verify-biometrics', async (req: Request, res: Response, next: Next
         gender: finalGender,
         age_bucket: ageBucket,
         birth_year: userRow?.credential_birth_year || null,
-        birth_date: userRow?.credential_dob ? userRow.credential_dob.toISOString().split('T')[0] : null,
+        birth_date: userRow?.credential_dob ? (() => {
+          const d = userRow.credential_dob;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })() : null,
         region: userRegionCodes[0] || 'reg_tbilisi', // Match JWT's region value
         region_codes: finalRegionCodes,
         citizenship: 'GEO',

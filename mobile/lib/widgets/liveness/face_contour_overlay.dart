@@ -2,8 +2,10 @@ import 'dart:ui';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../../services/liveness/liveness_controller.dart';
+import '../../services/localization_service.dart';
 import 'liveness_animations.dart';
 
 /// Updated FaceContourOverlay - New flagship mesh style (pale, thin, photo-like triangulation)
@@ -62,6 +64,7 @@ class _FaceContourOverlayState extends State<FaceContourOverlay>
     return AnimatedBuilder(
       animation: Listenable.merge([widget.controller, _scanController]),
       builder: (context, child) {
+        final loc = Provider.of<LocalizationService>(context);
         final state = widget.controller.state;
         final msg = widget.controller.feedbackMessage;
         final face = widget.controller.currentFace;
@@ -138,9 +141,7 @@ class _FaceContourOverlayState extends State<FaceContourOverlay>
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Text(
-                                state == LivenessState.challenge1
-                                    ? "STEP 1/2"
-                                    : "STEP 2/2",
+                                "${loc.translate('step_ratio')} ${state == LivenessState.challenge1 ? '1/2' : '2/2'}",
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.8),
                                   fontSize: 12,
@@ -164,7 +165,7 @@ class _FaceContourOverlayState extends State<FaceContourOverlay>
                             Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: Text(
-                                msg,
+                                loc.translate(msg),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -210,7 +211,7 @@ class _FaceContourOverlayState extends State<FaceContourOverlay>
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      "Try Again (${widget.controller.attemptsLeft})",
+                                      "${loc.translate('try_again_with_attempts')} (${widget.controller.attemptsLeft})",
                                       style: const TextStyle(
                                         color: Colors.red,
                                         fontWeight: FontWeight.bold,

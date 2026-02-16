@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/ticket.dart';
 import '../../services/api_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/localization_service.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final String ticketId;
@@ -93,18 +95,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       await _loadTicketDetail();
 
       if (mounted) {
+        final loc = Provider.of<LocalizationService>(context, listen: false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Response sent'),
+          SnackBar(
+            content: Text(loc.translate('response_sent')),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final loc = Provider.of<LocalizationService>(context, listen: false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send: ${e.toString()}'),
+            content: Text(
+              '${loc.translate('failed_send_status')}: ${e.toString()}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -118,26 +124,30 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _ticketDetail != null
-              ? '#${_ticketDetail!.ticket.ticketNumber}'
-              : 'Ticket Details',
-        ),
-        backgroundColor: AppTheme.darkBackground,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadTicketDetail,
+    return Consumer<LocalizationService>(
+      builder: (context, loc, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              _ticketDetail != null
+                  ? '${loc.translate('ticket_number')}${_ticketDetail!.ticket.ticketNumber}'
+                  : loc.translate('ticket_details'),
+            ),
+            backgroundColor: AppTheme.darkBackground,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadTicketDetail,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: _buildBody(),
+          body: _buildBody(loc),
+        );
+      },
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(LocalizationService loc) {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppTheme.facebookBlue),
@@ -199,12 +209,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 children: [
                   _InfoChip(
                     icon: Icons.category,
-                    label: ticket.category.displayName,
+                    label: loc.translate(
+                      'ticket_category_${ticket.category.name}',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   _InfoChip(
                     icon: Icons.flag,
-                    label: ticket.priority.displayName,
+                    label: loc.translate(
+                      'ticket_priority_${ticket.priority.name}',
+                    ),
                     color: _getPriorityColor(ticket.priority),
                   ),
                 ],
@@ -223,18 +237,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               _MessageBubble(
                 message: ticket.message ?? '',
                 isAdmin: false,
-                senderName: 'You',
+                senderName: loc.translate('you'),
                 timestamp: ticket.createdAt,
                 isOriginal: true,
+                loc: loc,
               ),
 
               // Responses
-              ...responses.map((response) => _MessageBubble(
-                    message: response.message,
-                    isAdmin: response.isAdmin,
-                    senderName: response.senderName,
-                    timestamp: response.createdAt,
-                  )),
+              ...responses.map(
+                (response) => _MessageBubble(
+                  message: response.message,
+                  isAdmin: response.isAdmin,
+                  senderName: response.isAdmin
+                      ? loc.translate('support')
+                      : loc.translate('you'),
+                  timestamp: response.createdAt,
+                  loc: loc,
+                ),
+              ),
 
               // Closed notice
               if (isClosed)
@@ -244,7 +264,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   decoration: BoxDecoration(
                     color: Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -252,7 +274,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'This ticket has been closed.',
+                          loc.translate('ticket_closed_notice'),
                           style: TextStyle(color: Colors.grey.shade400),
                         ),
                       ),
@@ -269,9 +291,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppTheme.darkSurface,
-              border: Border(
-                top: BorderSide(color: Colors.grey.shade800),
-              ),
+              border: Border(top: BorderSide(color: Colors.grey.shade800)),
             ),
             child: SafeArea(
               child: Row(
@@ -280,7 +300,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     child: TextField(
                       controller: _messageController,
                       decoration: InputDecoration(
-                        hintText: 'Type your reply...',
+                        hintText: loc.translate('reply_hint'),
                         hintStyle: TextStyle(color: Colors.grey.shade600),
                         filled: true,
                         fillColor: AppTheme.darkCard,
@@ -347,12 +367,14 @@ class _MessageBubble extends StatelessWidget {
   final String senderName;
   final DateTime timestamp;
   final bool isOriginal;
+  final LocalizationService loc;
 
   const _MessageBubble({
     required this.message,
     required this.isAdmin,
     required this.senderName,
     required this.timestamp,
+    required this.loc,
     this.isOriginal = false,
   });
 
@@ -365,8 +387,9 @@ class _MessageBubble extends StatelessWidget {
         right: isAdmin ? 32 : 0,
       ),
       child: Column(
-        crossAxisAlignment:
-            isAdmin ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        crossAxisAlignment: isAdmin
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
         children: [
           // Sender name and time
           Padding(
@@ -391,18 +414,17 @@ class _MessageBubble extends StatelessWidget {
                 Text(
                   senderName,
                   style: TextStyle(
-                    color: isAdmin ? AppTheme.facebookBlue : Colors.grey.shade400,
+                    color: isAdmin
+                        ? AppTheme.facebookBlue
+                        : Colors.grey.shade400,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _formatTime(timestamp),
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 11,
-                  ),
+                  _formatTime(timestamp, loc),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                 ),
               ],
             ),
@@ -421,15 +443,14 @@ class _MessageBubble extends StatelessWidget {
                 bottomRight: !isAdmin ? const Radius.circular(4) : null,
               ),
               border: isAdmin
-                  ? Border.all(color: AppTheme.facebookBlue.withValues(alpha: 0.3))
+                  ? Border.all(
+                      color: AppTheme.facebookBlue.withValues(alpha: 0.3),
+                    )
                   : null,
             ),
             child: Text(
               message,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
-              ),
+              style: const TextStyle(fontSize: 14, height: 1.4),
             ),
           ),
         ],
@@ -437,11 +458,10 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime date) {
+  String _formatTime(DateTime date, LocalizationService loc) {
     final now = DateTime.now();
-    final isToday = date.day == now.day &&
-        date.month == now.month &&
-        date.year == now.year;
+    final isToday =
+        date.day == now.day && date.month == now.month && date.year == now.year;
 
     if (isToday) {
       return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
@@ -458,6 +478,7 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     Color color;
     switch (status) {
       case TicketStatus.open:
@@ -484,7 +505,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        status.displayName,
+        loc.translate('ticket_status_${status.name}'),
         style: TextStyle(
           color: color,
           fontSize: 12,
@@ -519,13 +540,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-            ),
-          ),
+          Text(label, style: TextStyle(color: color, fontSize: 12)),
         ],
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/localization_service.dart';
 import '../../models/poll.dart';
 
 class VoteReceiptScreen extends StatelessWidget {
@@ -15,6 +17,7 @@ class VoteReceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -26,19 +29,15 @@ class VoteReceiptScreen extends StatelessWidget {
               const Spacer(),
 
               // Success Icon
-              Icon(
-                Icons.check_circle,
-                size: 100,
-                color: Colors.green,
-              ),
+              Icon(Icons.check_circle, size: 100, color: Colors.green),
               const SizedBox(height: 24),
 
               // Success Message
               Text(
-                'Vote Submitted!',
+                loc.translate('vote_submitted'),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -51,19 +50,19 @@ class VoteReceiptScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildReceiptRow(
-                        'Poll',
+                        loc.translate('poll'),
                         poll.title,
                         context,
                       ),
                       const Divider(height: 24),
                       _buildReceiptRow(
-                        'Your Vote',
+                        loc.translate('your_vote'),
                         selectedOption.text,
                         context,
                       ),
                       const Divider(height: 24),
                       _buildReceiptRow(
-                        'Transaction Hash',
+                        loc.translate('transaction_hash'),
                         txHash,
                         context,
                         mono: true,
@@ -83,7 +82,7 @@ class VoteReceiptScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
                 ),
-                child: const Text('Back to Home'),
+                child: Text(loc.translate('back_to_home')),
               ),
               const SizedBox(height: 24),
             ],
@@ -104,17 +103,17 @@ class VoteReceiptScreen extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.grey),
         ),
         const SizedBox(height: 4),
         Text(
           value,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-                fontFamily: mono ? 'monospace' : null,
-              ),
+            fontWeight: FontWeight.w500,
+            fontFamily: mono ? 'monospace' : null,
+          ),
         ),
       ],
     );

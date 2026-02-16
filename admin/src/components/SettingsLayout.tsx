@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { MapPin, Shield, Coins, ShieldCheck, Bell } from 'lucide-react';
+import { MapPin, Shield, Coins, ShieldCheck, Bell, Globe } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const settingsTabs = [
@@ -7,6 +7,7 @@ const settingsTabs = [
   { path: '/settings/regions', label: 'Regions', icon: MapPin },
   { path: '/settings/verification-providers', label: 'Verification Providers', icon: Shield },
   { path: '/settings/security', label: 'Security Policies', icon: ShieldCheck },
+  { path: '/settings/geo-blocking', label: 'Geo-Blocking', icon: Globe },
   { path: '/settings/notifications', label: 'Notifications', icon: Bell },
 ];
 
