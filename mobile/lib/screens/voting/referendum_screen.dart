@@ -16,23 +16,21 @@ class ReferendumScreen extends StatefulWidget {
 class _ReferendumScreenState extends State<ReferendumScreen> {
   String? _selectedOptionId;
 
-  Color _getOptionColor(String text, int index) {
-    final lower = text.toLowerCase();
-    if (lower == 'yes' || lower == 'for' || lower == 'approve') {
+  Color _getOptionColor(int index) {
+    if (index == 0) {
       return Colors.green;
     }
-    if (lower == 'no' || lower == 'against' || lower == 'reject') {
+    if (index == 1) {
       return Colors.red;
     }
     return Colors.grey;
   }
 
-  IconData _getOptionIcon(String text) {
-    final lower = text.toLowerCase();
-    if (lower == 'yes' || lower == 'for' || lower == 'approve') {
+  IconData _getOptionIcon(int index) {
+    if (index == 0) {
       return Icons.check_circle;
     }
-    if (lower == 'no' || lower == 'against' || lower == 'reject') {
+    if (index == 1) {
       return Icons.cancel;
     }
     return Icons.remove_circle;
@@ -103,8 +101,8 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                       itemBuilder: (context, index) {
                         final option = widget.poll.options[index];
                         final isSelected = _selectedOptionId == option.id;
-                        final color = _getOptionColor(option.text, index);
-                        final icon = _getOptionIcon(option.text);
+                        final color = _getOptionColor(index);
+                        final icon = _getOptionIcon(index);
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),

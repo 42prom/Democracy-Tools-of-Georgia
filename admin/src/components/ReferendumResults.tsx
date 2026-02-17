@@ -13,11 +13,11 @@ const OPTION_COLORS: Record<string, string> = {
   abstain: '#9ca3af',
 };
 
-function getOptionColor(text: string, index: number): string {
-  const lower = text.toLowerCase();
-  if (lower === 'yes' || lower === 'for' || lower === 'approve') return OPTION_COLORS.yes;
-  if (lower === 'no' || lower === 'against' || lower === 'reject') return OPTION_COLORS.no;
-  if (lower === 'abstain' || lower === 'neutral') return OPTION_COLORS.abstain;
+function getOptionColor(_text: string, index: number): string {
+  if (index === 0) return OPTION_COLORS.yes;
+  if (index === 1) return OPTION_COLORS.no;
+  if (index === 2) return OPTION_COLORS.abstain;
+  
   const fallback = ['#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
   return fallback[index % fallback.length];
 }
@@ -25,28 +25,46 @@ function getOptionColor(text: string, index: number): string {
 function determineOutcome(
   results: PollResults,
   threshold: number
-): { passed: boolean | null; yesPercent: number; noPercent: number; abstainPercent: number } {
-  let yesCount = 0;
-  let noCount = 0;
-  let abstainCount = 0;
-  let totalVotes = 0;
+): { 
+  passed: boolean | null; 
+  yesPercent: number; 
+  noPercent: number; 
+  abstainPercent: number;
+  yesCount: number;
+  noCount: number;
+  abstainCount: number;
+  yesLabel: string;
+  noLabel: string;
+  abstainLabel: string;
+} {
+  // We assume the first option is the "pass" option, second is "reject", and third is "abstain"
+  // based on the display_order from the backend.
+  
+  const getCount = (r: any) => typeof r?.count === 'number' ? r.count : 0;
+  
+  const yesOption = results.results[0];
+  const noOption = results.results[1];
+  const abstainOption = results.results[2];
 
-  for (const r of results.results) {
-    const count = typeof r.count === 'number' ? r.count : 0;
-    const lower = r.optionText.toLowerCase();
-    totalVotes += count;
-
-    if (lower === 'yes' || lower === 'for' || lower === 'approve') {
-      yesCount += count;
-    } else if (lower === 'no' || lower === 'against' || lower === 'reject') {
-      noCount += count;
-    } else {
-      abstainCount += count;
-    }
-  }
+  const yesCount = getCount(yesOption);
+  const noCount = getCount(noOption);
+  const abstainCount = getCount(abstainOption);
+  
+  const totalVotes = yesCount + noCount + abstainCount;
 
   if (totalVotes === 0) {
-    return { passed: null, yesPercent: 0, noPercent: 0, abstainPercent: 0 };
+    return { 
+      passed: null, 
+      yesPercent: 0, 
+      noPercent: 0, 
+      abstainPercent: 0,
+      yesCount: 0,
+      noCount: 0,
+      abstainCount: 0,
+      yesLabel: yesOption?.optionText || 'Yes',
+      noLabel: noOption?.optionText || 'No',
+      abstainLabel: abstainOption?.optionText || 'Abstain',
+    };
   }
 
   const decisiveVotes = yesCount + noCount;
@@ -59,6 +77,12 @@ function determineOutcome(
     yesPercent,
     noPercent,
     abstainPercent,
+    yesCount,
+    noCount,
+    abstainCount,
+    yesLabel: yesOption?.optionText || 'Yes',
+    noLabel: noOption?.optionText || 'No',
+    abstainLabel: abstainOption?.optionText || 'Abstain',
   };
 }
 
@@ -108,21 +132,30 @@ export default function ReferendumResults({ results, referendumQuestion, thresho
           </p>
         </div>
         <div className="bg-green-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-green-600 mb-1">Yes</p>
+          <p className="text-xs text-green-600 mb-1">{outcome.yesLabel}</p>
           <p className="text-xl font-bold text-green-700">
             {outcome.yesPercent.toFixed(1)}%
           </p>
+          <p className="text-[10px] text-green-500 mt-1 font-medium">
+            {outcome.yesCount.toLocaleString()} votes
+          </p>
         </div>
         <div className="bg-red-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-red-600 mb-1">No</p>
+          <p className="text-xs text-red-600 mb-1">{outcome.noLabel}</p>
           <p className="text-xl font-bold text-red-700">
             {outcome.noPercent.toFixed(1)}%
           </p>
+          <p className="text-[10px] text-red-500 mt-1 font-medium">
+            {outcome.noCount.toLocaleString()} votes
+          </p>
         </div>
         <div className="bg-gray-50 rounded-lg p-3 text-center">
-          <p className="text-xs text-gray-500 mb-1">Abstain</p>
+          <p className="text-xs text-gray-500 mb-1">{outcome.abstainLabel}</p>
           <p className="text-xl font-bold text-gray-600">
             {outcome.abstainPercent.toFixed(1)}%
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1 font-medium">
+            {outcome.abstainCount.toLocaleString()} votes
           </p>
         </div>
       </div>
@@ -147,10 +180,10 @@ export default function ReferendumResults({ results, referendumQuestion, thresho
         </div>
         <div className="flex items-center justify-between text-xs mt-1">
           <span className="text-green-600 font-medium">
-            Yes: {outcome.yesPercent.toFixed(1)}%
+            {outcome.yesLabel}: {outcome.yesPercent.toFixed(1)}%
           </span>
           <span className="text-red-600 font-medium">
-            No: {outcome.noPercent.toFixed(1)}%
+            {outcome.noLabel}: {outcome.noPercent.toFixed(1)}%
           </span>
         </div>
       </div>

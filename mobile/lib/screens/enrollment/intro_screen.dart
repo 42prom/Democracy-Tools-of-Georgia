@@ -83,9 +83,8 @@ class _IntroScreenState extends State<IntroScreen> {
                       const SizedBox(height: 12),
                       Text(
                         loc.translate('secure_enrollment'),
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -98,8 +97,53 @@ class _IntroScreenState extends State<IntroScreen> {
 
                       _InfoCard(
                         title: loc.translate('identity_verification_card'),
-                        description: loc.translate('identity_verification_card_desc'),
+                        description: loc.translate(
+                          'identity_verification_card_desc',
+                        ),
                       ),
+
+                      const SizedBox(height: 32),
+                      Center(
+                        child: Image.asset(
+                          'assets/images/enrollment_illustration.png',
+                          height: MediaQuery.of(context).size.height * 0.38,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            // Placeholder while file is missing
+                            return Container(
+                              height: 220,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: cs.primary.withValues(alpha: 0.1),
+                                  style: BorderStyle.solid,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.image_outlined,
+                                    size: 48,
+                                    color: cs.primary.withValues(alpha: 0.2),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Illustration Placeholder',
+                                    style: TextStyle(
+                                      color: cs.primary.withValues(alpha: 0.3),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
@@ -144,10 +188,7 @@ class _IntroScreenState extends State<IntroScreen> {
 }
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.title,
-    required this.description,
-  });
+  const _InfoCard({required this.title, required this.description});
 
   final String title;
   final String description;

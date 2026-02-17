@@ -4,6 +4,7 @@ import { createPoll, estimateAudience, publishPoll, getSurveyQuestions, updatePo
 import { AudienceRules } from '../../types/polls';
 import { createError } from '../../middleware/errorHandler';
 import { pool } from '../../db/client';
+import { AppConfig } from '../../config/app';
 
 const router = Router();
 
@@ -247,7 +248,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const K_THRESHOLD = 30;
+      const K_THRESHOLD = AppConfig.MIN_K_ANONYMITY;
 
       // Verify poll exists and is a survey
       const pollResult = await pool.query('SELECT * FROM polls WHERE id = $1', [id]);

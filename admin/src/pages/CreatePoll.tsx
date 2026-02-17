@@ -553,17 +553,25 @@ export default function CreatePoll() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Response Options
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Response Options
+                    </label>
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                      Role & Color
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     {referendumOptions.map((opt, index) => (
                       <div key={opt.id} className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${
-                          index === 0 ? 'bg-green-500' : index === 1 ? 'bg-red-500' : 'bg-gray-400'
-                        }`} />
+                        <div 
+                          title={index === 0 ? "Pass Choice" : index === 1 ? "Reject Choice" : "Neutral Choice"}
+                          className={`w-3 h-3 rounded-full shrink-0 ${
+                            index === 0 ? 'bg-green-500' : index === 1 ? 'bg-red-500' : 'bg-gray-400'
+                          }`} 
+                        />
                         <Input
-                          placeholder={`Option ${index + 1}`}
+                          placeholder={index === 0 ? "Positive choice (e.g. Yes)" : index === 1 ? "Negative choice (e.g. No)" : "Abstain"}
                           value={opt.text}
                           onChange={(e) =>
                             setReferendumOptions(
@@ -622,7 +630,7 @@ export default function CreatePoll() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    The "Yes" option must reach this percentage (excluding abstentions) to pass.
+                    The {referendumOptions[0]?.text || '"Yes"'} option must reach this percentage (excluding abstentions) to pass.
                   </p>
                 </div>
 
