@@ -23,8 +23,11 @@ class PushNotificationService {
   }
 
   private async initialize() {
-    if (this.disabled) {
-      console.log('[PushService] Firebase notifications are disabled via FIREBASE_DISABLED env var.');
+    // Import isTest dynamically to avoid circular dependency if possible, or just standard import
+    // But better to use process.env to be safe and simple
+    if (process.env.NODE_ENV === 'test' || this.disabled) {
+      console.log('[PushService] Notifications disabled (Test Mode or Config).');
+      this.disabled = true;
       return;
     }
 
@@ -303,6 +306,20 @@ class PushNotificationService {
         console.error('[PushService] Error in notifyMessagePublished:', error);
       }
     });
+  }
+  /**
+   * Gracefully shut down the service
+   */
+  public async shutdown() {
+    if (this.initialized && admin.apps.length > 0) {
+      try {
+        await admin.app().delete();
+        this.initialized = false;
+        console.log('[PushService] Firebase Admin SDK shut down.');
+      } catch (error) {
+        console.error('[PushService] Error shutting down:', error);
+      }
+    }
   }
 }
 

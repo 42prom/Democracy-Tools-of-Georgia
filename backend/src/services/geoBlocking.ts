@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { pool } from '../db/client';
-import { redisClient } from '../db/redis';
+import redisClient from '../db/redis';
 
 const CACHE_PREFIX = 'geo:';
 const CACHE_TTL = 300; // 5 minutes

@@ -24,8 +24,9 @@ describe('Health Endpoint', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty('status');
-    expect(response.body).toHaveProperty('timestamp');
     expect(response.body).toHaveProperty('dependencies');
+    expect(response.body.dependencies.postgres.status).toBe('up');
+    expect(response.body.dependencies.redis.status).toBe('up');
   });
 
   it('should report database and redis status', async () => {

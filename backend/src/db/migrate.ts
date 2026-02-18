@@ -180,16 +180,60 @@ export async function runMigrations(): Promise<void> {
 }
 
 /**
+ * Check migration status
+ */
+export async function checkStatus(): Promise<void> {
+  console.log('Checking database migration status...\n');
+
+  try {
+    // Ensure migrations table exists (just in case)
+    await createMigrationsTable();
+
+    const appliedVersions = await getAppliedMigrations();
+    const availableMigrations = await getAvailableMigrations();
+    
+    // Check for Docker init simulation
+    await detectDockerInit(appliedVersions, availableMigrations);
+    const updatedAppliedVersions = await getAppliedMigrations();
+
+    console.log(`\n[Migration Status]`);
+    console.log(`Applied: ${updatedAppliedVersions.size}`);
+    console.log(`Available: ${availableMigrations.length}`);
+
+    const pending = availableMigrations.filter(m => !updatedAppliedVersions.has(m.version));
+
+    if (pending.length > 0) {
+      console.log(`\n⚠️  ${pending.length} Pending Migration(s):`);
+      pending.forEach(m => console.log(` - ${m.version}: ${m.filename}`));
+      process.exit(1); // Exit 1 to indicate pending migrations (useful for CI)
+    } else {
+      console.log('\n✓ Database is up to date.');
+      process.exit(0);
+    }
+  } catch (error) {
+    console.error('Failed to check status:', error);
+    process.exit(1);
+  }
+}
+
+/**
  * CLI entry point
  */
 if (require.main === module) {
-  runMigrations()
-    .then(() => {
-      console.log('\nDatabase migration complete');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('\nDatabase migration error:', error);
-      process.exit(1);
-    });
+  const args = process.argv.slice(2);
+  const command = args[0];
+
+  if (command === 'status') {
+    checkStatus();
+  } else {
+    runMigrations()
+      .then(() => {
+        console.log('\nDatabase migration complete');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('\nDatabase migration error:', error);
+        process.exit(1);
+      });
+  }
 }

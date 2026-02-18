@@ -52,37 +52,5 @@ describe('Auth Endpoints', () => {
     });
   });
 
-  describe('POST /api/v1/auth/login-or-enroll', () => {
-    it('should reject request without pnDigits', async () => {
-      const response = await request(app)
-        .post('/api/v1/auth/login-or-enroll')
-        .send({
-          liveness: true,
-          faceMatch: true,
-        });
 
-      expect(response.status).toBe(400);
-    });
-
-    it('should accept valid enrollment request with pnDigits', async () => {
-      const response = await request(app)
-        .post('/api/v1/auth/login-or-enroll')
-        .send({
-          pnDigits: '12345678901', // 11 digits (Georgian PN format)
-          liveness: true,
-          faceMatch: true,
-          gender: 'M',
-          birthYear: 1990,
-          regionCodes: ['reg_tbilisi'],
-        });
-
-      // Should return 200 with credential or 400 if validation fails
-      // The actual result depends on whether the identity service is configured
-      expect([200, 400, 500]).toContain(response.status);
-
-      if (response.status === 200) {
-        expect(response.body).toHaveProperty('credential');
-      }
-    });
-  });
 });

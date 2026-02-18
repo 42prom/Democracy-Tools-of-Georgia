@@ -81,12 +81,22 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.use('/', healthRouter);
+// Routes
+// Note: healthRouter defines '/' (health) and '/metrics'
+// So mounting at '/health' means: /health -> health, /health/metrics -> metrics
+app.use('/health', healthRouter);
+// Also mount root '/' to health check for convenience/root probes
+app.use('/', (req, res, next) => {
+  if (req.path === '/') {
+    return healthRouter(req, res, next);
+  }
+  return next();
+});
 
 // API v1 routes
 app.use('/api/v1/auth', dynamicRateLimit('login'), authRouter); // Dynamic limit for auth
 // Admin routes receive NO rate limiting to prevent lockout
-app.use('/api/v1/admin', (_req, _res, next) => next()); 
+// Admin routes receive NO rate limiting (handled above) 
 
 
 app.use('/api/v1/enrollment', dynamicRateLimit('enrollment'), enrollmentRouter); // Dynamic limit for enrollment
@@ -197,9 +207,11 @@ async function shutdown() {
     try {
       const { RewardProcessor } = await import('./services/rewardProcessor');
       const { PollStatusMonitor } = await import('./services/pollMonitor');
+      const { pushService } = await import('./services/pushNotifications');
       
       RewardProcessor.stop();
       PollStatusMonitor.stop();
+      await pushService.shutdown();
     } catch (e) {}
 
     console.log('✓ Connections closed');
@@ -244,4 +256,5 @@ if (!isTest) {
   startServer();
 }
 
+export const server = app; // Export app for testing
 export default app;

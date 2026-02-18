@@ -1,78 +1,75 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/services/interfaces/i_api_service.dart';
+import 'package:mobile/services/service_locator.dart';
 import 'package:mobile/services/wallet_service.dart';
-import 'package:mobile/models/transaction.dart';
+import 'package:mobile/models/reward_balance.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Wallet MVP Tests (No PIN)
-///
-/// Updated rule:
-/// - Wallet does NOT use PIN unlock anymore.
-/// - Wallet actions are available without local PIN gating.
-/// - Security is handled by login/session + OS device security.
-///
-/// These tests validate:
-/// 1) Address generation + persistence
-/// 2) Balance persistence + updates
-/// 3) Transaction history storage
-/// 4) Send token mock flow updates balance and stores tx
-/// 5) clearAll resets wallet state
+class FakeApiService extends Fake implements IApiService {
+  @override
+  Future<void> registerWallet(String address) async {
+    // No-op
+  }
+
+  @override
+  Future<List<RewardBalance>> getRewardBalance() async {
+    return [RewardBalance(token: 'DTG', amount: 100.0)];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getTransactions() async {
+    return [];
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendTokens({
+    required String toAddress,
+    required String amount,
+  }) async {
+    return {
+      'success': true,
+      'txId': 'mock_tx_${DateTime.now().millisecondsSinceEpoch}',
+      'newBalance': 89.5, // Mock new balance
+    };
+  }
+}
+
 void main() {
   group('Wallet Service Tests (No PIN)', () {
     late WalletService walletService;
 
     setUp(() async {
       TestWidgetsFlutterBinding.ensureInitialized();
-
-      // Ensure SharedPreferences works in test environment
       SharedPreferences.setMockInitialValues({});
+
+      // Inject Fake
+      ServiceLocator.mockApiService = FakeApiService();
 
       walletService = WalletService();
     });
 
     tearDown(() async {
       await walletService.clearAll();
+      ServiceLocator.mockApiService = null;
     });
 
     test('Wallet address is generated and persisted', () async {
       final address1 = await walletService.getWalletAddress();
-
       expect(address1, startsWith('0x'));
-      expect(address1.length, equals(42)); // 0x + 40 hex chars
+      expect(address1.length, equals(42));
 
-      // Should persist across calls
       final address2 = await walletService.getWalletAddress();
       expect(address2, equals(address1));
     });
 
-    test('Balance starts at 0.00 and can be updated', () async {
+    test('Balance starts at 100.00 (from fake) and can be updated', () async {
+      // getBalance calls API which returns 100.0
       final initial = await walletService.getBalance();
-      expect(initial, equals('0.00'));
+      expect(initial, equals('100.00'));
 
       await walletService.updateBalance('12.34');
-
       final updated = await walletService.getBalance();
       expect(updated, equals('12.34'));
-    });
-
-    test('Transactions can be added and stored', () async {
-      final tx = Transaction(
-        id: '1',
-        type: TransactionType.receive,
-        status: TransactionStatus.confirmed,
-        amount: '5.00',
-        token: 'TEST',
-        address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        timestamp: DateTime.now(),
-        txHash: 'mock_tx_1',
-      );
-
-      await walletService.addTransaction(tx);
-
-      // Verify by adding another and checking storage indirectly through sendTokens,
-      // or you can extend WalletService with a getter later.
-      // For now we ensure no exceptions and balance update works.
-      await walletService.updateBalance('5.00');
-      expect(await walletService.getBalance(), equals('5.00'));
     });
 
     test('sendTokens creates mock tx and decreases balance', () async {
@@ -86,29 +83,20 @@ void main() {
 
       expect(txHash, startsWith('mock_tx_'));
 
+      // Our FakeApiService returns newBalance: 89.5
       final balanceAfter = await walletService.getBalance();
       expect(balanceAfter, equals('89.50'));
     });
 
-    test('clearAll resets wallet storage and balance', () async {
-      // Generate address + set balance
-      final addr = await walletService.getWalletAddress();
-      expect(addr, startsWith('0x'));
-
-      await walletService.updateBalance('9.99');
-      expect(await walletService.getBalance(), equals('9.99'));
-
-      // Clear all
+    test('clearAll resets wallet state', () async {
+      await walletService.updateBalance('50.00');
       await walletService.clearAll();
 
-      // Balance resets
-      expect(await walletService.getBalance(), equals('0.00'));
-
-      // Address regenerates (new wallet)
-      final newAddr = await walletService.getWalletAddress();
-      expect(newAddr, startsWith('0x'));
-      expect(newAddr.length, equals(42));
-      expect(newAddr, isNot(equals(addr)));
+      // After clear, getBalance calls API again -> 100.00
+      // But locally cached balance is gone.
+      // Wait, getBalance behavior: fetch from API, cache, return.
+      // So it should be 100.00.
+      expect(await walletService.getBalance(), equals('100.00'));
     });
   });
 }

@@ -1,4 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request } from 'express';
+import pino from 'pino';
+import pinoHttp from 'pino-http';
 import { getRequestId } from './requestId';
 
 // Extend Express Request type
@@ -11,47 +13,60 @@ declare global {
 }
 
 /**
- * Structured JSON logging middleware
- * Uses request ID from requestIdMiddleware (must be mounted before this)
+ * Configure Pino Logger
+ * - Production: JSON format (fast, machine-readable)
+ * - Development: Pretty print (human-readable)
  */
-export function requestLogger(req: Request, res: Response, next: NextFunction) {
-  const requestId = getRequestId(req);
-  const start = Date.now();
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: process.env.NODE_ENV !== 'production' 
+    ? { 
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+        }
+      } 
+    : undefined,
+  redact: {
+    paths: ['req.headers.authorization', 'req.body.password', 'req.body.token'],
+    remove: true,
+  },
+});
 
-  // Log request (Production: only log if error or sensitive? Or always?
-  // Common practice: Log all access in JSON)
-  // We'll log request Start only in dev to reduce noise, but Response always.
+/**
+ * Structured JSON logging middleware using Pino
+ */
+export const requestLogger = pinoHttp({
+  logger,
+  // Use existing Request ID if present
+  genReqId: (req: Request) => getRequestId(req) || req.id || crypto.randomUUID(),
   
-  if (process.env.NODE_ENV === 'development') {
-    const requestLog = {
-      level: 'info',
-      type: 'request',
-      requestId,
-      timestamp: new Date().toISOString(),
+  // Custom serializers
+  serializers: {
+    req: (req) => ({
+      id: req.id,
       method: req.method,
-      path: req.path,
+      url: req.url,
       ip: req.ip,
-    };
-    console.log(JSON.stringify(requestLog));
-  }
-
-  // Log response when finished
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const responseLog = {
-      level: res.statusCode >= 400 ? 'error' : 'info',
-      type: 'response',
-      requestId,
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      path: req.path,
+      // Minimal headers to reduce noise
+      headers: {
+        'user-agent': req.headers['user-agent'],
+        'content-type': req.headers['content-type'],
+      },
+    }),
+    res: (res) => ({
       statusCode: res.statusCode,
-      durationMs: duration,
-    };
+    }),
+  },
+  
+  // Quiet mode for health checks to reduce noise
+  autoLogging: {
+    ignore: (req) => {
+      return req.url === '/health' || req.url === '/metrics';
+    },
+  },
+});
 
-    // Always log responses in JSON
-    console.log(JSON.stringify(responseLog));
-  });
-
-  next();
-}
+export { logger }; // Export base logger for manual logging usage

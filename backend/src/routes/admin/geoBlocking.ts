@@ -15,7 +15,7 @@ router.use(requireAdmin);
 // SETTINGS
 // ============================================================================
 
-router.get('/settings', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/settings', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const settings = await GeoBlockingService.getSettings();
     res.json(settings);
@@ -42,7 +42,7 @@ router.patch('/settings', async (req: Request, res: Response, next: NextFunction
 // COUNTRIES
 // ============================================================================
 
-router.get('/countries', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/countries', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const countries = await GeoBlockingService.getBlockedCountries();
     res.json(countries);
@@ -56,7 +56,8 @@ router.post('/countries', async (req: Request, res: Response, next: NextFunction
     const { country_code, country_name, reason } = req.body;
 
     if (!country_code || !country_name) {
-      return res.status(400).json({ error: 'country_code and country_name required' });
+      res.status(400).json({ error: 'country_code and country_name required' });
+      return;
     }
 
     await GeoBlockingService.blockCountry(
@@ -67,6 +68,7 @@ router.post('/countries', async (req: Request, res: Response, next: NextFunction
     );
 
     res.json({ success: true, message: `${country_name} blocked` });
+    return;
   } catch (err) {
     next(err);
   }
@@ -74,7 +76,7 @@ router.post('/countries', async (req: Request, res: Response, next: NextFunction
 
 router.delete('/countries/:code', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await GeoBlockingService.deleteCountry(req.params.code);
+    await GeoBlockingService.deleteCountry(req.params.code as string);
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -85,7 +87,7 @@ router.delete('/countries/:code', async (req: Request, res: Response, next: Next
 // BLOCKED IPs
 // ============================================================================
 
-router.get('/blocked-ips', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/blocked-ips', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const ips = await GeoBlockingService.getBlockedIPs();
     res.json(ips);
@@ -99,7 +101,8 @@ router.post('/blocked-ips', async (req: Request, res: Response, next: NextFuncti
     const { ip_address, reason, expires_at } = req.body;
 
     if (!ip_address) {
-      return res.status(400).json({ error: 'ip_address required' });
+      res.status(400).json({ error: 'ip_address required' });
+      return;
     }
 
     await GeoBlockingService.blockIP(
@@ -110,6 +113,7 @@ router.post('/blocked-ips', async (req: Request, res: Response, next: NextFuncti
     );
 
     res.json({ success: true, message: `${ip_address} blocked` });
+    return;
   } catch (err) {
     next(err);
   }
@@ -117,7 +121,7 @@ router.post('/blocked-ips', async (req: Request, res: Response, next: NextFuncti
 
 router.delete('/blocked-ips/:ip', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await GeoBlockingService.unblockIP(decodeURIComponent(req.params.ip));
+    await GeoBlockingService.unblockIP(decodeURIComponent(req.params.ip as string));
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -128,7 +132,7 @@ router.delete('/blocked-ips/:ip', async (req: Request, res: Response, next: Next
 // WHITELIST
 // ============================================================================
 
-router.get('/whitelist', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/whitelist', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const ips = await GeoBlockingService.getWhitelistedIPs();
     res.json(ips);
@@ -142,7 +146,8 @@ router.post('/whitelist', async (req: Request, res: Response, next: NextFunction
     const { ip_address, description } = req.body;
 
     if (!ip_address) {
-      return res.status(400).json({ error: 'ip_address required' });
+      res.status(400).json({ error: 'ip_address required' });
+      return;
     }
 
     await GeoBlockingService.whitelistIP(
@@ -152,6 +157,7 @@ router.post('/whitelist', async (req: Request, res: Response, next: NextFunction
     );
 
     res.json({ success: true, message: `${ip_address} whitelisted` });
+    return;
   } catch (err) {
     next(err);
   }
@@ -159,7 +165,7 @@ router.post('/whitelist', async (req: Request, res: Response, next: NextFunction
 
 router.delete('/whitelist/:ip', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await GeoBlockingService.removeWhitelistIP(decodeURIComponent(req.params.ip));
+    await GeoBlockingService.removeWhitelistIP(decodeURIComponent(req.params.ip as string));
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -181,7 +187,7 @@ router.get('/logs', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const stats = await GeoBlockingService.getBlockedStats();
     res.json(stats);
@@ -199,7 +205,8 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
     const { ip_address } = req.body;
 
     if (!ip_address) {
-      return res.status(400).json({ error: 'ip_address required' });
+      res.status(400).json({ error: 'ip_address required' });
+      return;
     }
 
     const geoInfo = await GeoBlockingService.lookupIP(ip_address);

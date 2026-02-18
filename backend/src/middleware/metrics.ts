@@ -1,84 +1,57 @@
 import { Request, Response, NextFunction } from 'express';
-import { HttpClientFactory } from '../utils/httpClient';
+import client from 'prom-client';
+
+// Create a Registry
+const register = new client.Registry();
+
+// Add default metrics (CPU, Memory, Event Loop)
+client.collectDefaultMetrics({ register, prefix: 'dtg_backend_' });
+
+// Define custom metrics
+const httpRequestDurationMicroseconds = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  buckets: [0.1, 0.5, 1, 1.5, 2, 5],
+  registers: [register],
+});
+
+const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
+
+const httpErrorsTotal = new client.Counter({
+  name: 'http_errors_total',
+  help: 'Total number of HTTP errors',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
 
 /**
- * Simple in-memory metrics for observability
- * In production, these would be exported to Prometheus/CloudWatch/etc.
+ * Middleware to collect Prometheus metrics
  */
-class MetricsCollector {
-  private requestCount = 0;
-  private errorCount = 0;
-  private latencySum = 0;
-  private latencyCount = 0;
-  private lastReset = Date.now();
-
-  recordRequest(): void {
-    this.requestCount++;
-  }
-
-  recordError(): void {
-    this.errorCount++;
-  }
-
-  recordLatency(ms: number): void {
-    this.latencySum += ms;
-    this.latencyCount++;
-  }
-
-  getStats(): MetricsSnapshot {
-    const biometricClient = HttpClientFactory.getBiometricClient();
-    const biometricHealthClient = HttpClientFactory.getBiometricHealthClient();
-
-    return {
-      requests: this.requestCount,
-      errors: this.errorCount,
-      errorRate: this.requestCount > 0 ? (this.errorCount / this.requestCount) : 0,
-      avgLatencyMs: this.latencyCount > 0 ? Math.round(this.latencySum / this.latencyCount) : 0,
-      uptime: Date.now() - this.lastReset,
-      biometric: {
-        circuitState: biometricClient.getCircuitState(),
-        healthClientState: biometricHealthClient.getCircuitState(),
-      },
-    };
-  }
-
-  reset(): void {
-    this.requestCount = 0;
-    this.errorCount = 0;
-    this.latencySum = 0;
-    this.latencyCount = 0;
-    this.lastReset = Date.now();
-  }
-}
-
-interface MetricsSnapshot {
-  requests: number;
-  errors: number;
-  errorRate: number;
-  avgLatencyMs: number;
-  uptime: number;
-  biometric: {
-    circuitState: string;
-    healthClientState: string;
-  };
-}
-
-// Singleton instance
-export const metrics = new MetricsCollector();
-
-/**
- * Middleware to collect request metrics
- */
-export function metricsMiddleware(_req: Request, res: Response, next: NextFunction): void {
+export function metricsMiddleware(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
-  metrics.recordRequest();
-
+  
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    metrics.recordLatency(duration);
-
+    const duration = (Date.now() - start) / 1000;
+    // Normalize route to avoid high cardinality (e.g., /polls/123 -> /polls/:id)
+    // req.route.path is available if the route was matched
+    const route = req.route ? req.originalUrl.replace(req.url, req.route.path) : req.path;
+    const status = res.statusCode.toString();
+    
+    httpRequestDurationMicroseconds.observe(
+      { method: req.method, route, status_code: status },
+      duration
+    );
+    
+    httpRequestsTotal.inc({ method: req.method, route, status_code: status });
+    
     if (res.statusCode >= 400) {
-      metrics.recordError();
+      httpErrorsTotal.inc({ method: req.method, route, status_code: status });
     }
   });
 
@@ -86,8 +59,15 @@ export function metricsMiddleware(_req: Request, res: Response, next: NextFuncti
 }
 
 /**
+ * Get Content-Type for Prometheus metrics
+ */
+export function getMetricsContentType(): string {
+  return register.contentType;
+}
+
+/**
  * Get current metrics snapshot
  */
-export function getMetrics(): MetricsSnapshot {
-  return metrics.getStats();
+export async function getMetrics(): Promise<string> {
+  return await register.metrics();
 }

@@ -1,4 +1,5 @@
 import { pool } from '../db/client';
+import { logger } from '../middleware/logger';
 
 export interface BiometricResult {
   score: number;
@@ -38,15 +39,8 @@ export class BiometricService {
     // Double check specific counts just in case (Tier 3: 3 rejects, Tier 2: 5 retries)
     // FIX: Do not block solely on count if lock has expired. 
     // The "locked_until" field is the source of truth for active blocks.
-    
-    /* 
-    if (reject_count >= 3) {
-      return { allowed: false, reason: 'Strict rejection limit reached (3/3). IP blocked.' };
-    }
-    if (retry_count >= 5) {
-      return { allowed: false, reason: 'Maximum retry attempts reached (5/5). IP blocked.' };
-    }
-    */
+
+    return { allowed: true };
 
     return { allowed: true };
   }
@@ -109,21 +103,35 @@ export class BiometricService {
    * Uses in-house biometric service for liveness + face matching
    */
   static async verify(ip: string, selfie: Buffer, docPortrait: Buffer): Promise<BiometricResult> {
-    console.log('\n========================================');
-    console.log('[BiometricService] Starting verification');
-    console.log('========================================');
-    console.log(`  IP: ${ip}`);
-    console.log(`  Selfie size: ${selfie.length} bytes`);
-    console.log(`  Doc portrait size: ${docPortrait.length} bytes`);
+    logger.info({ ip, selfieSize: selfie.length, docPortraitSize: docPortrait.length }, '[BiometricService] Starting verification');
+
+    // 0. Mock Mode (for E2E testing without Python service)
+    if (process.env.BIOMETRIC_MOCK_MODE === 'true') {
+        logger.warn({ ip }, '[BiometricService] MOCK MODE ENABLED. Returning fake success.');
+        // Simulate slight delay
+        await new Promise(r => setTimeout(r, 500));
+        
+        // Mock success result
+        const mockScore = 0.95;
+        await this.recordAttempt(ip, mockScore);
+        
+        return {
+            score: mockScore,
+            tier: 1,
+            allowed: true,
+            message: 'Mock verification passed',
+            isRetryable: false
+        };
+    }
 
     // 1. Check Rate Limit
-    console.log('\n[BiometricService] Step 1: Checking rate limit...');
+    logger.info({ ip }, '[BiometricService] Step 1: Checking rate limit...');
     const rate = await this.checkRateLimit(ip);
     if (!rate.allowed) {
-      console.log(`  BLOCKED: ${rate.reason}`);
+      logger.warn({ ip, reason: rate.reason }, '[BiometricService] BLOCKED by rate limit');
       return { score: 0, tier: 3, allowed: false, message: rate.reason, isRetryable: false };
     }
-    console.log('  Rate limit: PASSED');
+    logger.info({ ip }, '[BiometricService] Rate limit: PASSED');
 
     // 2. Fetch Settings & Instantiate Providers
     let score = 0.0;
@@ -132,16 +140,18 @@ export class BiometricService {
     let isRetryable = true;
 
     try {
-      console.log('\n[BiometricService] Step 2: Loading settings...');
+      logger.info('[BiometricService] Step 2: Loading settings...');
       const { getVerificationSettings } = require('./verificationSettings');
       const { pool } = require('../db/client');
       const crypto = require('crypto');
 
       const settings = await getVerificationSettings();
       minThreshold = settings.faceMatch.minThreshold;
-      console.log(`  Liveness provider: ${settings.liveness.provider}`);
-      console.log(`  Face match provider: ${settings.faceMatch.provider}`);
-      console.log(`  Face match threshold: ${minThreshold}`);
+      logger.info({
+        livenessProvider: settings.liveness.provider,
+        faceMatchProvider: settings.faceMatch.provider,
+        threshold: minThreshold
+      }, '[BiometricService] Providers initialized');
 
       // Fetch decrypted API keys directly from DB for the specific providers
       const keysResult = await pool.query(
@@ -178,13 +188,12 @@ export class BiometricService {
       const faceMatchProvider = VerificationProviderFactory.getFaceMatchProvider(settings.faceMatch.provider);
 
       // A. Liveness Check
-      console.log('\n[BiometricService] Step 3: Liveness verification...');
-      console.log(`  Provider: ${settings.liveness.provider}`);
+      logger.info({ provider: settings.liveness.provider }, '[BiometricService] Step 3: Liveness verification...');
       const livenessResult = await livenessProvider.verify(selfie, keysMap['verification_liveness_apikey']);
-      console.log(`  Liveness result: ${livenessResult.success ? 'PASS' : 'FAIL'}`);
-      if (livenessResult.message) console.log(`  Message: ${livenessResult.message}`);
+      logger.info({ success: livenessResult.success, message: livenessResult.message }, '[BiometricService] Liveness result');
+      
       if (!livenessResult.success) {
-        console.log('  [ABORT] Liveness check failed, not proceeding to face match');
+        logger.warn({ ip }, '[BiometricService] [ABORT] Liveness check failed');
         return {
           score: livenessResult.score || 0,
           tier: 3,
@@ -195,18 +204,20 @@ export class BiometricService {
       }
 
       // B. Face Matching
-      console.log('\n[BiometricService] Step 4: Face matching...');
-      console.log(`  Provider: ${settings.faceMatch.provider}`);
+      logger.info({ provider: settings.faceMatch.provider }, '[BiometricService] Step 4: Face matching...');
       const matchResult = await faceMatchProvider.match(selfie, docPortrait, keysMap['verification_facematch_apikey']);
       score = matchResult.score || 0;
-      console.log(`  Face match score: ${score.toFixed(3)}`);
-      console.log(`  Threshold: ${minThreshold}`);
-      console.log(`  Result: ${matchResult.success ? 'PASS' : 'FAIL'}`);
+      logger.info({
+        score: score.toFixed(3),
+        threshold: minThreshold,
+        success: matchResult.success
+      }, '[BiometricService] Face match result');
+      
       message = matchResult.message || (matchResult.success ? 'Face match successful' : 'Face match failed');
       isRetryable = matchResult.isRetryable ?? true;
 
       if (!matchResult.success) {
-        console.log('  [ABORT] Face match failed');
+        logger.warn({ ip, score }, '[BiometricService] [ABORT] Face match failed');
         return { score, tier: 3, allowed: false, message, isRetryable };
       }
 
@@ -222,17 +233,15 @@ export class BiometricService {
     }
 
     const tier = this.getTier(score, minThreshold);
-    console.log(`\n[BiometricService] Step 5: Determining tier...`);
-    console.log(`  Score: ${score.toFixed(3)} | Threshold: ${minThreshold}`);
-    console.log(`  Tier: ${tier} (1=Accept, 2=Retry, 3=Reject)`);
+    logger.info({ score: score.toFixed(3), threshold: minThreshold, tier }, '[BiometricService] Step 5: Determining tier');
 
     // 3. Record Attempt
-    console.log('\n[BiometricService] Step 6: Recording attempt...');
+    logger.info({ ip, tier }, '[BiometricService] Step 6: Recording attempt...');
     await this.recordAttempt(ip, score);
 
     // 4. Check if we just hit the limit
     const updatedRate = await this.checkRateLimit(ip);
-    console.log(`  Updated rate limit: ${updatedRate.allowed ? 'OK' : 'BLOCKED'}`);
+    logger.info({ ip, allowed: updatedRate.allowed }, '[BiometricService] Updated rate limit check');
 
     // 5. Return Result
     const allowed = tier === 1;
@@ -249,15 +258,13 @@ export class BiometricService {
       message = 'Identity verification failed. IP blocked due to too many low-confidence attempts.';
     }
 
-    console.log('\n========================================');
-    console.log('[BiometricService] FINAL RESULT');
-    console.log('========================================');
-    console.log(`  Allowed: ${allowed}`);
-    console.log(`  Score: ${score.toFixed(3)}`);
-    console.log(`  Tier: ${tier}`);
-    console.log(`  Retryable: ${finalIsRetryable}`);
-    console.log(`  Message: ${message}`);
-    console.log('========================================\n');
+    logger.info({
+      allowed,
+      score: score.toFixed(3),
+      tier,
+      retryable: finalIsRetryable,
+      message
+    }, '[BiometricService] Verification complete');
 
     return { score, tier, allowed, message, isRetryable: finalIsRetryable };
   }

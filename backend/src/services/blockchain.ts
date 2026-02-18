@@ -1,5 +1,6 @@
 import { pool } from '../db/client';
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
+import { logger } from '../middleware/logger';
 
 /**
  * Normalize an Ethereum address to a safe format.
@@ -10,7 +11,7 @@ function normalizeAddress(address: string): string {
   return address.toLowerCase();
 }
 
-console.log('[Blockchain] Address normalization is active');
+logger.info('[Blockchain] Address normalization is active');
 
 /**
  * Validate that a string is a valid Ethereum address (0x + 40 hex chars)
@@ -116,7 +117,7 @@ export class BlockchainService {
       }
       return this.provider;
     } catch (error: any) {
-      console.error(`[Blockchain] Failed to create provider for ${rpcUrl}:`, error.message);
+      logger.error({ rpcUrl, error: error.message }, '[Blockchain] Failed to create provider');
       throw new Error(`Failed to initialize blockchain provider: ${error.message}`);
     }
   }
@@ -278,17 +279,17 @@ export class BlockchainService {
     const cfg = await this.loadConfig();
 
     if (!cfg.rewardsEnabled) {
-      console.log('[Blockchain] Rewards disabled, skipping mint');
+      logger.info('[Blockchain] Rewards disabled, skipping mint');
       return { success: false, error: 'Rewards disabled' };
     }
 
     if (!cfg.rpcUrl) {
-      console.log('[Blockchain] RPC URL not configured, skipping mint');
+      logger.info('[Blockchain] RPC URL not configured, skipping mint');
       return { success: false, error: 'RPC URL not configured' };
     }
 
     if (!cfg.nftContractAddress) {
-      console.log('[Blockchain] NFT contract address not configured, skipping mint');
+      logger.info('[Blockchain] NFT contract address not configured, skipping mint');
       return { success: false, error: 'NFT contract address not configured' };
     }
 
@@ -297,18 +298,23 @@ export class BlockchainService {
 
     // Validate contract address format
     if (!isValidEthereumAddress(normNft)) {
-      console.error(`[Blockchain] Invalid NFT contract address format: ${cfg.nftContractAddress}`);
+      logger.error({ nftContractAddress: cfg.nftContractAddress }, '[Blockchain] Invalid NFT contract address format');
       return { success: false, error: `Invalid NFT contract address: ${cfg.nftContractAddress}` };
     }
 
     // Validate wallet address format
     if (!isValidEthereumAddress(normWallet)) {
-      console.error(`[Blockchain] Invalid wallet address format: ${walletAddress}`);
+      logger.error({ walletAddress }, '[Blockchain] Invalid wallet address format');
       return { success: false, error: `Invalid wallet address: ${walletAddress}` };
     }
 
-    console.log(`[Blockchain] Minting ${amount} reward(s) for ${normWallet}`);
-    console.log(`[Blockchain] RPC: ${cfg.rpcUrl}, Contract: ${normNft}, TokenID: ${cfg.rewardTokenId}`);
+    logger.info({
+      amount,
+      wallet: normWallet,
+      rpc: cfg.rpcUrl,
+      contract: normNft,
+      tokenId: cfg.rewardTokenId
+    }, '[Blockchain] Minting reward(s)');
 
     try {
       const wallet = await this.getWallet();
@@ -322,19 +328,22 @@ export class BlockchainService {
         '0x' // empty data
       );
 
-      console.log(`[Blockchain] Transaction submitted: ${tx.hash}`);
+      logger.info({ txHash: tx.hash }, '[Blockchain] Transaction submitted');
 
       // Wait for confirmations
       const receipt = await tx.wait(cfg.requiredConfirmations);
 
-      console.log(`[Blockchain] Transaction confirmed in block ${receipt.blockNumber}`);
+      logger.info({
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber
+      }, '[Blockchain] Transaction confirmed');
 
       return {
         success: true,
         txHash: tx.hash,
       };
     } catch (error: any) {
-      console.error(`[Blockchain] Mint failed:`, error);
+      logger.error({ error, wallet: walletAddress }, '[Blockchain] Mint failed');
 
       let errorMessage = 'Transaction failed';
       if (error.code === 'INSUFFICIENT_FUNDS') {
@@ -388,17 +397,20 @@ export class BlockchainService {
       const amountWei = ethers.parseUnits(amount, decimals);
 
       const tx = await contract.transfer(normTo, amountWei);
-      console.log(`[Blockchain] Transfer submitted: ${tx.hash}`);
+      logger.info({ txHash: tx.hash }, '[Blockchain] Transfer submitted');
 
       const receipt = await tx.wait(cfg.requiredConfirmations);
-      console.log(`[Blockchain] Transfer confirmed in block ${receipt.blockNumber}`);
+      logger.info({
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber
+      }, '[Blockchain] Transfer confirmed');
 
       return {
         success: true,
         txHash: tx.hash,
       };
     } catch (error: any) {
-      console.error(`[Blockchain] Transfer failed:`, error);
+      logger.error({ error, to: toAddress, amount }, '[Blockchain] Transfer failed');
       return {
         success: false,
         error: error.message || 'Transfer failed',
@@ -439,7 +451,7 @@ export class BlockchainService {
       const balance = await contract.balanceOf(normWallet);
       return { balance: ethers.formatEther(balance) };
     } catch (error: any) {
-      console.error(`[Blockchain] Get DTG balance failed:`, error);
+      logger.error({ error, wallet: walletAddress }, '[Blockchain] Get DTG balance failed');
       return { balance: '0', error: error.message };
     }
   }
@@ -501,17 +513,20 @@ export class BlockchainService {
       const amountWei = ethers.parseEther(amount);
       const tx = await contract.mint(normTo, amountWei);
 
-      console.log(`[Blockchain] DTG mint submitted: ${tx.hash}`);
+      logger.info({ txHash: tx.hash }, '[Blockchain] DTG mint submitted');
 
       const receipt = await tx.wait(cfg.requiredConfirmations);
-      console.log(`[Blockchain] DTG mint confirmed in block ${receipt.blockNumber}`);
+      logger.info({
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber
+      }, '[Blockchain] DTG mint confirmed');
 
       return {
         success: true,
         txHash: tx.hash,
       };
     } catch (error: any) {
-      console.error(`[Blockchain] DTG mint failed:`, error);
+      logger.error({ error, to: toAddress, amount }, '[Blockchain] DTG mint failed');
       return {
         success: false,
         error: error.message || 'Mint failed',

@@ -13,7 +13,17 @@ import 'real/real_api_service.dart';
 class ServiceLocator {
   ServiceLocator._();
 
+  static IApiService? _mockApiService;
+
+  /// Visible for testing
+  static set mockApiService(IApiService? mock) {
+    _mockApiService = mock;
+  }
+
   static IApiService get apiService {
+    if (_mockApiService != null) {
+      return _mockApiService!;
+    }
     return RealApiService();
   }
 
