@@ -1,0 +1,7 @@
+{
+  "pollId": "550e8400-e29b-41d4-a716-446655440000",
+  "optionId": "330e8400-e29b-...",
+  "nullifier": "hash_of_server_nonce_plus_device_secret...",
+  "nonce": "timestamp_nonce_...",
+  "signature": "device_signature_of_payload"
+}

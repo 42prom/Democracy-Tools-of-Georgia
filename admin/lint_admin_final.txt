@@ -1,0 +1,204 @@
+
+> dtg-admin@0.1.0 lint
+> eslint . --ext ts,tsx --report-unused-disable-directives
+
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\api\client.ts
+   58:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   58:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  277:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\AuditExportModal.tsx
+  30:7   error    Error: Cannot access variable before it is declared
+
+`loadPreview` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\AuditExportModal.tsx:30:7
+  28 |   useEffect(() => {
+  29 |     if (isOpen && pollId) {
+> 30 |       loadPreview();
+     |       ^^^^^^^^^^^ `loadPreview` accessed before it is declared
+  31 |     }
+  32 |   }, [isOpen, pollId]);
+  33 |
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\AuditExportModal.tsx:43:3
+  41 |   }, [isOpen]);
+  42 |
+> 43 |   const loadPreview = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 44 |     setStatus('loading-preview');
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 45 |     setError(null);
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 55 |   };
+     | ^^^^^ `loadPreview` is declared here
+  56 |
+  57 |   const handleExport = async () => {
+  58 |     setStatus('exporting');  react-hooks/immutability
+  32:6   warning  React Hook useEffect has a missing dependency: 'loadPreview'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+  51:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+  85:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\ReferendumResults.tsx
+  43:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\analytics\DemographicsCharts.tsx
+   53:47  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-explicit-any
+  131:38  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\analytics\DemographicsCharts.tsx:131:38
+  129 |                     ))}
+  130 |                   </Pie>
+> 131 |                   <Tooltip content={<CustomTooltip />} />
+      |                                      ^^^^^^^^^^^^^ This component is created during render
+  132 |                   <Legend verticalAlign="bottom" height={36} />
+  133 |                 </PieChart>
+  134 |               </ResponsiveContainer>
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\components\analytics\DemographicsCharts.tsx:53:25
+  51 |
+  52 |   // Custom Toolkit for Pie Chart
+> 53 |   const CustomTooltip = ({ active, payload }: any) => {
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     if (active && payload && payload.length) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 55 |       const data = payload[0].payload;
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 65 |     return null;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 66 |   };
+     | ^^^^ The component is created during render here
+  67 |
+  68 |   return (
+  69 |     <div className="space-y-6">  react-hooks/static-components
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\ActivePolls.tsx
+  145:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  155:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\CreatePoll.tsx
+   25:26  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+  103:6   warning  React Hook useEffect has missing dependencies: 'isEditing' and 'loadPollData'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  111:6   warning  React Hook useEffect has a missing dependency: 'estimateAudience'. Either include it or remove the dependency array                react-hooks/exhaustive-deps
+  219:68  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+  281:66  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+  334:23  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+  397:23  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+  453:21  error    Unexpected any. Specify a different type                                                                                           @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\Insights.tsx
+  26:6  warning  React Hook useEffect has a missing dependency: 'loadInsights'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\Login.tsx
+  29:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\MessageEditor.tsx
+   44:6   warning  React Hook useEffect has missing dependencies: 'isEditing' and 'loadMessageData'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+   84:33  error    Unexpected any. Specify a different type                                                                                              @typescript-eslint/no-explicit-any
+  117:29  error    Unexpected any. Specify a different type                                                                                              @typescript-eslint/no-explicit-any
+  117:69  error    Unexpected any. Specify a different type                                                                                              @typescript-eslint/no-explicit-any
+  149:29  error    Unexpected any. Specify a different type                                                                                              @typescript-eslint/no-explicit-any
+  149:69  error    Unexpected any. Specify a different type                                                                                              @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\MessagesList.tsx
+  50:6  warning  React Hook useEffect has a missing dependency: 'loadMessages'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\PollDetails.tsx
+   23:6   warning  React Hook useEffect has a missing dependency: 'loadPollData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  198:44  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  199:35  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  224:54  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  258:58  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  302:51  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  327:61  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  327:96  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\Profiles.tsx
+  252:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  289:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SecurityLogs.tsx
+  17:6  warning  React Hook useEffect has a missing dependency: 'loadSummary'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SettingsBlockchain.tsx
+  27:6   warning  React Hook useEffect has a missing dependency: 'loadSettings'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  35:21  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  48:17  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  55:28  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SettingsGeoBlocking.tsx
+  204:48  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  211:6   warning  React Hook useEffect has a missing dependency: 'loadAll'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  235:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  262:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  290:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  302:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  328:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  340:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  365:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  377:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  400:19  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+  542:57  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SettingsNotifications.tsx
+   46:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   75:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  106:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SettingsRegions.tsx
+  317:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\SettingsSecurity.tsx
+  195:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  248:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  285:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\TicketDetail.tsx
+  63:6  warning  React Hook useEffect has a missing dependency: 'loadTicket'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\Tickets.tsx
+  58:6  warning  React Hook useEffect has a missing dependency: 'loadTickets'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\pages\VotingHistory.tsx
+  198:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  199:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\tests\CreatePoll.test.tsx
+   34:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   40:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   63:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  142:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  186:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  255:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  258:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\tests\SettingsRegions.test.tsx
+   58:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  237:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  329:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  371:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  417:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  435:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  469:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  502:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\admin\src\types\index.ts
+  43:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  99:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 89 problems (77 errors, 12 warnings)
+
+(node:12588) ESLintRCWarning: You are using an eslintrc configuration file, which is deprecated and support will be removed in v10.0.0. Please migrate to an eslint.config.js file. See https://eslint.org/docs/latest/use/configure/migration-guide for details. An eslintrc configuration file is used because you have the ESLINT_USE_FLAT_CONFIG environment variable set to false. If you want to use an eslint.config.js file, remove the environment variable. If you want to find the location of the eslintrc configuration file, use the --debug flag.
+(Use `node --trace-warnings ...` to show where the warning was created)

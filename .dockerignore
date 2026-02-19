@@ -1,0 +1,79 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+architecture/
+api/
+
+# Dependencies (built in container)
+node_modules/
+.pnp
+.pnp.js
+
+# Environment (mounted or injected)
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Testing
+coverage/
+.nyc_output/
+
+# Mobile (not needed for backend Docker builds)
+mobile/
+android/
+ios/
+
+# Admin dist (built separately)
+admin/dist/
+admin/node_modules/
+
+# Logs
+*.log
+logs/
+
+# Cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.insightface/
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Debug artifacts
+*_output.txt
+*debug*.txt
+*_result.txt
+keys.txt
+
+# Development artifacts
+brain/
+directives/
+flutter-scaffold-skill/
+scripts/
+contracts/

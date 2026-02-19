@@ -1,0 +1,96 @@
+###############################################################################
+# Flutter / Dart
+###############################################################################
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+**/doc/api/
+
+# Dart compiled output / misc
+*.dart.js
+*.dart.js.deps
+*.dart.js.map
+*.dill
+*.lock
+
+###############################################################################
+# Android (Gradle / Android Studio)
+###############################################################################
+**/.gradle/
+**/local.properties
+**/key.properties
+
+# Android build outputs
+**/android/**/build/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# Keystores / signing
+**/*.jks
+**/*.keystore
+**/*.pem
+**/*.p12
+
+###############################################################################
+# iOS / macOS (Xcode / CocoaPods)
+###############################################################################
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/App.framework
+**/ios/Flutter/App.podspec
+**/ios/Flutter/.last_build_id
+
+# Xcode DerivedData & user files
+**/DerivedData/
+**/*.xcuserstate
+**/*.xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+###############################################################################
+# Web (if you ever enable Flutter web)
+###############################################################################
+**/web/.dart_tool/
+**/web/build/
+
+###############################################################################
+# IDEs / Editors
+###############################################################################
+.idea/
+*.iml
+*.ipr
+*.iws
+
+.vscode/
+*.code-workspace
+
+###############################################################################
+# OS / Misc
+###############################################################################
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+*.log
+*.swp
+*.swo
+*.tmp
+*.bak
+*.old
+
+###############################################################################
+# Optional: CI artifacts
+###############################################################################
+*.class
+*.pyc
+*.pdb
+*.o
+*.obj

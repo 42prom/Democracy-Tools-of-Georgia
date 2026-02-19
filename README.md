@@ -1,0 +1,237 @@
+# Democracy Tools of Georgia (DTG) 🇬🇪
+
+[![GitHub Stars](https://img.shields.io/github/stars/42prom/Democracy-Tools-of-Georgia?style=flat-square)](https://github.com/42prom/Democracy-Tools-of-Georgia/stargazers)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Nakeuri Protocol](https://img.shields.io/badge/Protocol-Flagship%2B%2B%20by%20Nakeuri-purple?style=flat-square)](https://github.com/42prom)
+
+**Democracy Tools of Georgia (DTG)** is an enterprise-grade digital voting and referendum platform designed to ensure transparency, security, and accessibility.
+
+Built on a custom **Flagship++ Protocol (designed by Mikheili Nakeuri)**, this system integrates:
+
+- **Biometric Identity Verification**: AI-powered Face Matching & Liveness Detection.
+- **eMRTD/NFC Scanning**: Passport/ID chip reading (ISO/IEC 14443).
+- **Blockchain Immutability**: Tamper-proof voting records.
+- **Enterprise Security**: Rate limits, Geo-blocking, and strict CORS policies.
+
+---
+
+## 🚀 Key Features
+
+### 🛡️ Identity & Enrollment
+
+- **NFC ePassport Reading**: Extract high-res photos and data directly from chips.
+- **Liveness Detection**: Active & Passive Face Liveness to prevent spoofing.
+- **Face Matching**: Verify selfie against ID photo with high confidence scoring.
+- **Smart Image Optimization**: Automatic resizing and normalization of high-res biometric inputs.
+
+### 🗳️ Voting Engine
+
+- **Referendums & Polls**: Create dynamic, region-targeted polls.
+- **Audience Filtering**: Target voters by age, region, and custom demographics.
+- **Immutable Receipts**: Voters receive cryptographic proof of their vote.
+
+### � Enterprise Security
+
+- **Defense in Depth**:
+  - **Static Rate Limiting**: 60 req/min (Auth), 300 req/min (API).
+  - **Dynamic Protection**: Auto-ban IPs after repeated login/liveness failures.
+- **Data Privacy**: k-Anonymity for analytics and strict data minimization.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer          | Technologies                                                          |
+| :------------- | :-------------------------------------------------------------------- |
+| **Mobile**     | Flutter, NFC Manager, ML Kit (Face Detection), flutter_image_compress |
+| **Backend**    | Node.js, TypeScript, Express, Helmet, CORS                            |
+| **Database**   | PostgreSQL 15 (with GIN Indexes for Analytics), Redis (Rate Limiting) |
+| **Biometrics** | Python, FastAPI, InsightFace / FaceNet                                |
+| **DevOps**     | Docker Compose, Multi-stage builds                                    |
+
+---
+
+## 🗳️ Voting Protocol
+
+The system implements a multi-layered security protocol to ensure election integrity, voter anonymity, and tamper-proof results.
+
+### End-to-End Flow
+
+```mermaid
+sequenceDiagram
+    participant Voter as Voter (Mobile App)
+    participant Backend as Backend Service
+    participant Bio as Biometric Service
+    participant DB as Postgres (Ledger)
+    participant BC as Blockchain (L2)
+
+    Note over Voter, Backend: 1. Identity Verification
+    Voter->>Backend: Submit NFC ID + Liveness Selfie
+    Backend->>Bio: Verify (Face Match > 80% + Liveness)
+    Bio-->>Backend: Success (Hashed Identity)
+
+    Note over Voter, DB: 2. Anonymous Voting
+    Voter->>Backend: Submit Encrypted Vote + Nullifier
+    Backend->>DB: Check Nullifier (One-Person-One-Vote)
+    Backend->>DB: Store Vote in Hash Chain (Voter Id Separated)
+
+    Note over DB, BC: 3. Integrity & Anchoring
+    DB->>DB: Link Vote to previous Vote (SHA256)
+    Backend->>BC: Periodic Anchor (Merkle Root)
+```
+
+### Protocol Highlights
+
+1.  **Sovereign Identity**: Voters are verified via cryptographic NFC chips in government-issued documents, not just passwords.
+2.  **Nullifier Protection**: A cryptographic nullifier prevents double voting without linking the voter's identity to their specific choice.
+3.  **Internal Hash Chain**: Every vote contains a `chain_hash` linking it to the previous vote. Tampering with any historical vote breaks the entire validation chain.
+4.  **Blockchain Anchoring**: Periodic snapshots of the entire election state are anchored to a public blockchain (Ethereum/Polygon), ensuring that even database administrators cannot modify finalized results unnoticed.
+
+---
+
+## 🔒 Data Privacy & Profile Management
+
+The system is engineered for **Privacy by Design**, ensuring that personal identity cannot be linked to individual votes.
+
+### 1. Cryptographic Anonymization
+
+- **No Raw Personal Data**: The system never stores raw Personal Numbers. Identifiers are converted into one-way cryptographic hashes (`SHA256(PN + Salt)`) immediately upon entry.
+- **Identity Separation**: Voter profiles are stored in physically distinct tables from the ballot ledger (`votes`). There are no foreign keys or logical links between the identity layer and the voting layer.
+
+#### Identity vs. Ballot Firewall
+
+```mermaid
+graph TD
+    Entry([Voter Identification]) --> Proc{Nakeuri Protocol}
+
+    subgraph "Identity Firewall"
+        Proc -->|Hash & Salt| HID[Hashed Identity]
+        Proc -->|Masking| MUID[Masked User ID]
+        HID --> ID_Store[(Identity Tables)]
+        MUID --> ID_Store
+    end
+
+    subgraph "Demographic Layer"
+        Proc -->|Demographics| Meta[Gender/Age/Region]
+        Meta --> ID_Store
+    end
+
+    subgraph "Ballot Layer"
+        Proc -->|Nullifier| NULL[Cryptographic Nullifier]
+        VOTE[Encrypted Vote] --> V_Store[(Vote Tables)]
+        NULL --> V_Store
+    end
+
+    ID_Store -.->|NO LOGICAL LINK| V_Store
+```
+
+### 2. Profile Storage & Metadata
+
+When a user enrolls, the following information is securely persisted:
+
+- **Demographic Metadata**: Gender, Birth Year, and Region codes are extracted from the official ID chip. This data is used solely for **Targeted Polling** and **Aggregated Analytics**.
+- **Device Binding**: A unique `device_key_thumbprint` binds the voter's identity to their specific hardware, preventing mass-automated voting from emulators or remote servers.
+- **UI Masking**: Sensitive fields like the Personal Number are masked (e.g., `010**********`) before being sent to the UI, ensuring that even if a screen is captured, full PII is not leaked.
+
+### 3. k-Anonymity Guardrails
+
+Poll results and security logs are protected by a **k-anonymity threshold (k=30)**. If an audience or result group is too small to ensure anonymity, the system automatically suppresses the data to prevent re-identification through demographic filtering.
+
+### 4. Session Security Policy
+
+To mitigate the risk of device theft or unauthorized access, the system enforces a strict **24-Hour Re-Verification Policy**:
+
+- **Token Expiry**: All enrollment and voting sessions expire exactly **24 hours** after issuance.
+- **Mandatory Re-Auth**: After expiry, the mobile app creates a "Session Timeout" event and forces the user to re-verify their identity (NFC or Liveness Check) to regain access.
+- **No Long-Lived Refresh Tokens**: The system relies on frequent, high-assurance biometric proofs rather than persistent credentials.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    User[Mobile App User] -->|HTTPS| API[Express API Gateway]
+    API -->|Auth Check| Redis[Redis Cache]
+    API -->|Store Data| DB[PostgreSQL]
+    API -->|Verify| Bio[Biometric Service]
+    API -->|Log| Logger[JSON Logger]
+```
+
+---
+
+## � Getting Started
+
+### Prerequisites
+
+- **Node.js**: v18+
+- **Docker**: v20+
+- **Flutter**: v3.19+
+
+### Quick Start (Development)
+
+1.  **Clone the Repository**
+
+    ```bash
+    git clone https://github.com/42prom/Democracy-Tools-of-Georgia.git
+    cd Democracy-Tools-of-Georgia
+    ```
+
+2.  **Start Infrastructure (Postgres, Redis)**
+
+    ```bash
+    docker-compose up -d postgres redis
+    ```
+
+3.  **Setup & Run Backend**
+
+    ```bash
+    cd backend
+    cp .env.example .env
+    npm install
+    npm run migrate    # Apply database schema
+    npm run dev        # Runs on API port 3000
+    ```
+
+4.  **Setup & Run Admin Panel**
+
+    ```bash
+    cd admin
+    cp .env.example .env
+    npm install
+    npm run dev        # Runs UI on port 5173
+    ```
+
+5.  **Run Biometric Service (Optional/Standalone)**
+
+    ```bash
+    cd biometric-service
+    pip install -r requirements.txt
+    python main.py     # Runs on port 8000
+    ```
+
+6.  **Run Mobile App**
+    ```bash
+    cd mobile
+    flutter pub get
+    flutter run
+    ```
+
+---
+
+## � License
+
+## 🤝 Community & Security
+
+- **Contributing**: Read our [Contribution Guidelines](CONTRIBUTING.md) to get started.
+- **Security**: Found a vulnerability? See our [Security Policy](SECURITY.md).
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+© 2026 Mikheili Nakeuri. Built for a better future.

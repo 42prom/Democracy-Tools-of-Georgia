@@ -1,0 +1,10 @@
+{
+  "proof": "eyJhbGciOiJ...",
+  "demographics": {
+    "dob": "1995-05-12",
+    "gender": "M",
+    "personalId": "12345678901",
+    "documentNumber": "12AA34567"
+  },
+  "deviceKey": "pub_key_base64..."
+}
