@@ -48,6 +48,21 @@ const toLocalISOString = (dateStr?: string | Date) => {
   )}:${pad(date.getMinutes())}`;
 };
 
+// Helper to reliably convert local YYYY-MM-DDTHH:MM string to UTC ISO string
+const toUtcISOString = (localStr?: string) => {
+  if (!localStr) return undefined;
+  // Parse parts manually to avoid browser-specific ambiguity
+  const [datePart, timePart] = localStr.split('T');
+  if (!datePart || !timePart) return undefined;
+  
+  const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+  const [hours, mins] = timePart.split(':').map(num => parseInt(num, 10));
+  
+  // This constructor uses the local timezone
+  const date = new Date(year, month - 1, day, hours, mins);
+  return isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 export default function CreatePoll() {
   const { id: pollId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -348,8 +363,8 @@ export default function CreatePoll() {
         description: description || undefined,
         type: pollType,
         audience_rules: getAudienceRules(),
-        start_at: startDate ? new Date(startDate).toISOString() : undefined,
-        end_at: endDate ? new Date(endDate).toISOString() : undefined,
+        start_at: toUtcISOString(startDate),
+        end_at: toUtcISOString(endDate),
         rewards_enabled: rewardsEnabled,
         reward_amount: rewardsEnabled && rewardAmount ? parseFloat(rewardAmount) : undefined,
         reward_token: rewardsEnabled ? rewardToken : undefined,
@@ -411,8 +426,8 @@ export default function CreatePoll() {
         description: description || undefined,
         type: pollType,
         audience_rules: getAudienceRules(),
-        start_at: startDate ? new Date(startDate).toISOString() : undefined,
-        end_at: endDate ? new Date(endDate).toISOString() : undefined,
+        start_at: toUtcISOString(startDate),
+        end_at: toUtcISOString(endDate),
         rewards_enabled: rewardsEnabled,
         reward_amount: rewardsEnabled && rewardAmount ? parseFloat(rewardAmount) : undefined,
         reward_token: rewardsEnabled ? rewardToken : undefined,
