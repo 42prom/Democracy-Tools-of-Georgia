@@ -19,9 +19,10 @@ export default function DraftedPolls() {
     setLoading(true);
     try {
       const data = await adminPollsApi.list('draft');
-      setPolls(data);
+      setPolls(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load drafts:', error);
+      setPolls([]);
     } finally {
       setLoading(false);
     }

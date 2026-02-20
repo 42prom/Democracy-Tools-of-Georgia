@@ -28,7 +28,8 @@ export default function Dashboard() {
     setLoading(true);
     try {
       // Load all polls
-      const allPolls = await adminPollsApi.list();
+      const rawPolls = await adminPollsApi.list();
+      const allPolls = Array.isArray(rawPolls) ? rawPolls : [];
 
       // Calculate stats
       const active = allPolls.filter(p => p.status === 'active').length;

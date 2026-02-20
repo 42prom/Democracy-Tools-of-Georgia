@@ -55,9 +55,10 @@ export default function MessagesList() {
       const data = await adminMessagesApi.list(
         activeTab === 'all' ? undefined : activeTab
       );
-      setMessages(data);
+      setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load messages:', error);
+      setMessages([]);
     } finally {
       setLoading(false);
     }

@@ -43,9 +43,13 @@ class RiskEngine:
             await self.block_ip(ip, f"Risk score exceeded: {current}")
 
     async def block_ip(self, ip: str, reason: str, duration_sec: int = 3600):
-        """Applies a hard block to an IP."""
+        """Applies a hard block to an IP and updates the O(1) block counter."""
         block_key = f"shield:block:{ip}"
+        # Only increment counter if this IP isn't already blocked
+        already_blocked = await self.redis.exists(block_key)
         await self.redis.setex(block_key, duration_sec, reason)
+        if not already_blocked:
+            await self.redis.incr("shield:block_count")
         print(f"[SHIELD] BLOCKED IP {ip}: {reason}")
 
     # =========================================================================
@@ -75,27 +79,7 @@ class RiskEngine:
                     if blocked_countries_raw:
                         blocked_countries = json.loads(blocked_countries_raw)
                         if blocked_countries:  # Only check if there are actual blocked countries
-                            # Try cached geo info first
-                            country_code = None
-                            geo_info_raw = await self.redis.get(f"geo:ip:{ip}")
-                            if geo_info_raw:
-                                geo_info = json.loads(geo_info_raw)
-                                country_code = geo_info.get("country_code")
-                            else:
-                                # No cache: do a live lookup directly in the Shield
-                                try:
-                                    import httpx as _httpx
-                                    async with _httpx.AsyncClient(timeout=3.0) as _c:
-                                        r = await _c.get(f"http://ip-api.com/json/{ip}?fields=status,countryCode")
-                                        data = r.json()
-                                        if data.get("status") == "success":
-                                            country_code = data.get("countryCode")
-                                            # Cache for 1 hour to avoid repeated lookups
-                                            geo_payload = json.dumps({"country_code": country_code, "ip": ip})
-                                            await self.redis.setex(f"geo:ip:{ip}", 3600, geo_payload)
-                                except Exception as lookup_err:
-                                    print(f"[SHIELD] Live geo-lookup failed for {ip}: {lookup_err}")
-
+                            country_code = await self._get_country_code(ip)
                             if country_code and country_code.upper() in [c.upper() for c in blocked_countries]:
                                 print(f"[SHIELD] GEO-BLOCKED: {ip} from {country_code}")
                                 return True, f"Geo-Blocked: {country_code} is restricted"
@@ -121,21 +105,12 @@ class RiskEngine:
                             if reason:
                                 return True, f"Shield Risk Block: {reason}"
 
-                # 3b. VPN / Proxy blocking (synced from Admin Security Policies page)
+                # 3b. VPN / Proxy blocking — cached to avoid live lookup on every request
                 if sec_settings.get("block_vpn_and_proxy") == "true":
-                    try:
-                        import httpx as _httpx
-                        async with _httpx.AsyncClient(timeout=3.0) as _c:
-                            r = await _c.get(
-                                f"http://ip-api.com/json/{ip}?fields=status,proxy,hosting,query"
-                            )
-                            data = r.json()
-                            if data.get("status") == "success":
-                                if data.get("proxy") or data.get("hosting"):
-                                    print(f"[SHIELD] VPN/PROXY BLOCKED: {ip} (proxy={data.get('proxy')}, hosting={data.get('hosting')})")
-                                    return True, f"Security Policy: VPN/Proxy/Datacenter traffic blocked"
-                    except Exception as vpn_err:
-                        print(f"[SHIELD] VPN check failed for {ip}: {vpn_err}")
+                    is_vpn, vpn_reason = await self._check_vpn_cached(ip)
+                    if is_vpn:
+                        print(f"[SHIELD] VPN/PROXY BLOCKED: {ip} ({vpn_reason})")
+                        return True, f"Security Policy: VPN/Proxy/Datacenter traffic blocked"
 
                 # 3c. Biometric IP throttle synchronization
                 max_bio = int(sec_settings.get("max_biometric_attempts_per_ip", 10))
@@ -168,14 +143,71 @@ class RiskEngine:
         return False, ""
 
     # =========================================================================
+    # PRIVATE HELPERS — cached external lookups
+    # =========================================================================
+
+    async def _get_country_code(self, ip: str) -> str | None:
+        """Returns country code for an IP, using Redis cache (TTL 1h)."""
+        cache_key = f"geo:ip:{ip}"
+        cached_raw = await self.redis.get(cache_key)
+        if cached_raw:
+            return json.loads(cached_raw).get("country_code")
+        try:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=3.0) as _c:
+                r = await _c.get(f"http://ip-api.com/json/{ip}?fields=status,countryCode")
+                data = r.json()
+                if data.get("status") == "success":
+                    country_code = data.get("countryCode")
+                    geo_payload = json.dumps({"country_code": country_code, "ip": ip})
+                    await self.redis.setex(cache_key, 3600, geo_payload)
+                    return country_code
+        except Exception as lookup_err:
+            print(f"[SHIELD] Geo lookup failed for {ip}: {lookup_err}")
+        return None
+
+    async def _check_vpn_cached(self, ip: str) -> tuple[bool, str]:
+        """
+        Checks if IP is a VPN/proxy/datacenter. Result is cached in Redis
+        for 1 hour to avoid a live ip-api.com call on every request.
+        Returns (is_vpn, reason_string).
+        """
+        cache_key = f"shield:vpn:{ip}"
+        cached_raw = await self.redis.get(cache_key)
+        if cached_raw:
+            cached = json.loads(cached_raw)
+            return cached.get("is_vpn", False), cached.get("reason", "")
+
+        try:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=3.0) as _c:
+                r = await _c.get(
+                    f"http://ip-api.com/json/{ip}?fields=status,proxy,hosting,query"
+                )
+                data = r.json()
+                if data.get("status") == "success":
+                    is_vpn = bool(data.get("proxy") or data.get("hosting"))
+                    reason = f"proxy={data.get('proxy')}, hosting={data.get('hosting')}"
+                    # Cache result for 1 hour — VPN status rarely changes
+                    payload = json.dumps({"is_vpn": is_vpn, "reason": reason})
+                    await self.redis.setex(cache_key, 3600, payload)
+                    return is_vpn, reason
+        except Exception as vpn_err:
+            print(f"[SHIELD] VPN check failed for {ip}: {vpn_err}")
+
+        return False, ""
+
+    # =========================================================================
     # DASHBOARD HELPERS
     # =========================================================================
 
     async def get_block_count(self) -> int:
-        keys = await self.redis.keys("shield:block:*")
-        return len(keys)
+        """O(1) block count using a dedicated counter key (not KEYS scan)."""
+        count = await self.redis.get("shield:block_count")
+        return int(count) if count else 0
 
     async def get_all_blocked(self) -> dict:
+        """Returns all blocked IPs with reasons and TTLs."""
         keys = await self.redis.keys("shield:block:*")
         blocked = {}
         for key in keys:

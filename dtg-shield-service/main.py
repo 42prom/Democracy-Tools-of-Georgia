@@ -36,11 +36,27 @@ async def shutdown_event():
 
 @app.middleware("http")
 async def shield_middleware(request: Request, call_next):
-    # 1. Get Client IP safely
-    client_ip = request.client.host
-    if "x-forwarded-for" in request.headers:
-        client_ip = request.headers["x-forwarded-for"].split(",")[0].strip()
-        
+    # 1. Get Client IP — prefer CF-Connecting-IP (Cloudflare sets this and
+    #    strips any client-forged version), then fall back to X-Forwarded-For,
+    #    then the raw TCP socket address.
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or request.client.host
+    )
+
+    # ── ADMIN BYPASS ────────────────────────────────────────────────────────
+    # Authenticated admin routes and the admin login endpoint bypass all
+    # Shield risk/geo/VPN checks. The backend's requireAdmin middleware still
+    # enforces valid JWT authentication, so there is no security gap.
+    ADMIN_PATHS = ["/api/v1/admin/"]
+    is_admin_path = any(request.url.path.startswith(p) for p in ADMIN_PATHS)
+    if is_admin_path:
+        response = await call_next(request)
+        response.headers["X-Shield-Bypass"] = "admin"
+        return response
+    # ── END ADMIN BYPASS ─────────────────────────────────────────────────────
+
     # 2. Heuristic Analysis - Check if blocked by Shield Risk Engine
     start_time = time.time()
     
@@ -92,6 +108,9 @@ async def proxy(request: Request, path: str):
     excluded_headers = ["host", "content-length"]
     headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
     headers["x-forwarded-for"] = request.client.host
+    # Force uncompressed responses: the shield cannot re-encode compressed bodies,
+    # so we tell the backend to send plain text to avoid zstd/gzip decode issues.
+    headers["accept-encoding"] = "identity"
 
     try:
         # Stream the request body
@@ -112,8 +131,9 @@ async def proxy(request: Request, path: str):
             async for chunk in target_resp.aiter_bytes():
                 yield chunk
                 
-        # Filter response headers
-        resp_headers = {k: v for k, v in target_resp.headers.items() if k.lower() not in ["content-encoding", "content-length", "transfer-encoding"]}
+        # Filter response headers — keep content-encoding so browser can decompress if needed
+        # Only strip transfer-encoding and content-length (recomputed by StreamingResponse)
+        resp_headers = {k: v for k, v in target_resp.headers.items() if k.lower() not in ["content-length", "transfer-encoding"]}
                 
         return StreamingResponse(
             stream_response(),

@@ -76,12 +76,18 @@ export default function Profiles() {
         sortBy: 'enrolledAt',
         sortOrder: 'desc',
       });
-      setProfiles(response.profiles);
-      setTotalCount(typeof response.total === 'number' ? response.total : response.profiles.length);
-      setTotalPages(response.totalPages);
+      // Defensive: profiles may be undefined if backend returns unexpected shape
+      const safeProfiles = Array.isArray(response?.profiles) ? response.profiles : [];
+      setProfiles(safeProfiles);
+      // total can be '<k' (string) when below k-anonymity threshold
+      const safeTotal = typeof response?.total === 'number' ? response.total : safeProfiles.length;
+      setTotalCount(safeTotal);
+      setTotalPages(typeof response?.totalPages === 'number' ? response.totalPages : 1);
     } catch (error) {
       console.error('Failed to load profiles:', error);
-      alert('Failed to load profiles');
+      setProfiles([]);
+      setTotalCount(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }

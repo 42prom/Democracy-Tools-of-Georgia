@@ -32,10 +32,11 @@ export default function VotingHistory() {
     setLoading(true);
     try {
       const data = await adminPollsApi.list('ended');
+      const safeData = Array.isArray(data) ? data : [];
 
       // Load results for each poll
       const pollsWithResults = await Promise.all(
-        data.map(async (poll) => {
+        safeData.map(async (poll) => {
           try {
             const results = await analyticsApi.getPollResults(poll.id, ['age', 'gender', 'region']);
             return { ...poll, results };
@@ -49,6 +50,7 @@ export default function VotingHistory() {
       setPolls(pollsWithResults);
     } catch (error) {
       console.error('Failed to load history:', error);
+      setPolls([]);
     } finally {
       setLoading(false);
     }

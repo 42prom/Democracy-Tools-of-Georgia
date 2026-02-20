@@ -57,6 +57,8 @@ services:
   backend:
     build: ./backend
     container_name: dtg-backend
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=development
       - PORT=3000
@@ -68,7 +70,7 @@ services:
       - API_KEY_ENCRYPTION_SECRET=f1e2d3c4b5a697801234567890abcdef1234567890abcdef1234567890abcdef
       - DEVICE_HASH_SECRET=1a2b3c4d5e6f78901234567890abcdef1234567890abcdef1234567890abcdef
       - VOTER_HASH_SECRET=9a8b7c6d5e4f32101234567890abcdef1234567890abcdef1234567890abcdef
-      - CORS_ORIGIN=http://localhost:5173
+      - CORS_ORIGIN=http://localhost:5173,https://admin.esme.ge,https://api.esme.ge
       - MIN_K_ANONYMITY=1
     depends_on:
       postgres:
@@ -107,6 +109,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_PROXY_TARGET=http://dtg-shield-service:8080
+      - VITE_API_BASE_URL=https://api.esme.ge/api/v1
     depends_on:
       - dtg-shield-service
     restart: always

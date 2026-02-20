@@ -62,6 +62,9 @@ import { AppConfig, isTest } from './config/app';
 const app: Express = express();
 const PORT = AppConfig.PORT;
 
+// Trust proxy headers (e.g. from Shield, Cloudflare)
+app.set('trust proxy', true);
+
 // Middleware stack
 app.use(compression());
 app.use(express.json({ limit: AppConfig.BODY_LIMIT }));

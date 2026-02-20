@@ -23,10 +23,11 @@ export default function ActivePolls() {
     setLoading(true);
     try {
       const data = await adminPollsApi.list('active');
+      const safeData = Array.isArray(data) ? data : [];
 
       // Load results for each poll
       const pollsWithResults = await Promise.all(
-        data.map(async (poll) => {
+        safeData.map(async (poll) => {
           try {
             const results = await analyticsApi.getPollResults(poll.id);
             return { ...poll, results };
@@ -40,6 +41,7 @@ export default function ActivePolls() {
       setPolls(pollsWithResults);
     } catch (error) {
       console.error('Failed to load active polls:', error);
+      setPolls([]);
     } finally {
       setLoading(false);
     }

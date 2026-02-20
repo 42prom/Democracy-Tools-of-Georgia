@@ -43,10 +43,12 @@ class RealApiService implements IApiService {
     bool retry = true,
   }) async {
     int attempts = 0;
+    // Always disable gzip: Flutter's http package does not auto-decompress
+    final mergedHeaders = {'Accept-Encoding': 'identity', ...?headers};
     while (true) {
       try {
         final response = await http
-            .get(uri, headers: headers)
+            .get(uri, headers: mergedHeaders)
             .timeout(_httpTimeout);
         return response;
       } catch (e) {
@@ -69,8 +71,10 @@ class RealApiService implements IApiService {
     Map<String, String>? headers,
     Object? body,
   }) async {
+    // Always disable gzip: Flutter's http package does not auto-decompress
+    final mergedHeaders = {'Accept-Encoding': 'identity', ...?headers};
     return await http
-        .post(uri, headers: headers, body: body)
+        .post(uri, headers: mergedHeaders, body: body)
         .timeout(_httpTimeout);
   }
 
@@ -86,7 +90,12 @@ class RealApiService implements IApiService {
     final response = await http
         .get(
           Uri.parse('$baseUrl/polls'),
-          headers: {'Authorization': 'Bearer $_credential'},
+          headers: {
+            'Authorization': 'Bearer $_credential',
+            // Disable compression: Flutter's http package does not auto-decompress
+            // gzip, causing FormatException: Missing extension byte
+            'Accept-Encoding': 'identity',
+          },
         )
         .timeout(_httpTimeout);
 
@@ -302,16 +311,6 @@ class RealApiService implements IApiService {
   @override
   Future<EnrollmentNfcResponse> submitNfc(Map<String, dynamic> payload) async {
     final url = '$baseUrl/enrollment/nfc';
-    // Log safe payload (exclude huge strings)
-    final safePayload = Map<String, dynamic>.from(payload);
-    if (safePayload.containsKey('docPortraitBase64')) {
-      safePayload['docPortraitBase64'] =
-          '(base64 string... len=${payload['docPortraitBase64']?.length})';
-    }
-
-    debugPrint('DEBUG: sending to $url');
-    debugPrint('DEBUG: payload: $safePayload');
-
     final response = await http
         .post(
           Uri.parse(url),
@@ -319,9 +318,6 @@ class RealApiService implements IApiService {
           body: json.encode(payload),
         )
         .timeout(_httpTimeout);
-
-    debugPrint('DEBUG: response ${response.statusCode}');
-    debugPrint('DEBUG: response body: ${response.body}');
 
     if (response.statusCode == 200) {
       return EnrollmentNfcResponse.fromJson(json.decode(response.body));
@@ -335,9 +331,6 @@ class RealApiService implements IApiService {
     Map<String, dynamic> payload,
   ) async {
     final url = '$baseUrl/enrollment/document';
-    debugPrint('DEBUG: sending to $url');
-    debugPrint('DEBUG: payload keys: ${payload.keys.toList()}');
-
     final response = await http
         .post(
           Uri.parse(url),
@@ -345,9 +338,6 @@ class RealApiService implements IApiService {
           body: json.encode(payload),
         )
         .timeout(_httpTimeout);
-
-    debugPrint('DEBUG: response ${response.statusCode}');
-    debugPrint('DEBUG: response body: ${response.body}');
 
     if (response.statusCode == 200) {
       return EnrollmentContinueResponse.fromJson(json.decode(response.body));
@@ -361,14 +351,6 @@ class RealApiService implements IApiService {
     Map<String, dynamic> payload,
   ) async {
     final url = '$baseUrl/enrollment/verify-biometrics';
-    final safePayload = Map<String, dynamic>.from(payload);
-    if (safePayload.containsKey('selfieBase64')) {
-      safePayload['selfieBase64'] =
-          '(base64... len=${payload['selfieBase64']?.length})';
-    }
-    debugPrint('DEBUG: sending to $url');
-    debugPrint('DEBUG: payload keys: ${safePayload.keys.toList()}');
-
     final response = await http
         .post(
           Uri.parse(url),
@@ -376,9 +358,6 @@ class RealApiService implements IApiService {
           body: json.encode(payload),
         )
         .timeout(_httpTimeout);
-
-    debugPrint('DEBUG: response ${response.statusCode}');
-    debugPrint('DEBUG: response body: ${response.body}');
 
     if (response.statusCode == 200) {
       return EnrollmentFinalizeResponse.fromJson(json.decode(response.body));
@@ -390,20 +369,16 @@ class RealApiService implements IApiService {
   @override
   Future<List<Region>> getRegions() async {
     final url = '$baseUrl/enrollment/regions';
-    debugPrint('[API] getRegions: calling $url');
     try {
       final response = await http.get(Uri.parse(url)).timeout(_httpTimeout);
-      debugPrint('[API] getRegions: status=${response.statusCode}');
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        debugPrint('[API] getRegions: got ${data.length} regions');
         return data.map((e) => Region.fromJson(e)).toList();
       } else {
-        debugPrint('[API] getRegions: error body=${response.body}');
         throw Exception(_parseError(response.body));
       }
     } catch (e) {
-      debugPrint('[API] getRegions: exception=$e');
+      debugPrint('[API] getRegions failed: $e');
       rethrow;
     }
   }

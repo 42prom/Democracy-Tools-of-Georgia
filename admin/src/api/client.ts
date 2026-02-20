@@ -38,7 +38,7 @@ const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 // Error codes that indicate network issues (safe to retry)
 const RETRYABLE_ERROR_CODES = ['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ERR_NETWORK'];
 
-console.log('[API Client] Base URL:', BASE_URL);
+
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -119,6 +119,21 @@ apiClient.interceptors.response.use(
 
     // Log final error (after all retries exhausted or non-retryable)
     console.error('[API Error]', error.response?.status || 'NETWORK', config.url, error.message);
+
+    // Auto-logout on authentication failures (stale/expired token)
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      const isAuthEndpoint = config.url?.includes('/admin/auth/login');
+      if (!isAuthEndpoint) {
+        console.warn('[API] Authentication failed — clearing session and redirecting to login.');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        // Redirect to login without full page reload loop
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+
     return Promise.reject(error);
   }
 );

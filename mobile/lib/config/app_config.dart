@@ -18,7 +18,7 @@ class AppConfig {
   /// Backend API base URL (no trailing slash).
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:3000/api/v1',
+    defaultValue: 'https://api.esme.ge/api/v1',
   );
 
   /// Build flavor: dev | staging | prod
