@@ -64,10 +64,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    // Fetch all published messages
+    // Fetch published messages within their valid timeframe
     const result = await pool.query(
       `SELECT * FROM messages 
        WHERE status = 'published' 
+       AND (publish_at IS NULL OR publish_at <= NOW())
+       AND (expire_at IS NULL OR expire_at >= NOW())
        ORDER BY published_at DESC 
        LIMIT 100`
     );

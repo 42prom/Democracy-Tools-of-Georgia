@@ -130,6 +130,15 @@ router.post(
         throw createError('Active survey poll not found', 404);
       }
 
+      const poll = pollResult.rows[0];
+      const nowUtc = new Date();
+      if (poll.start_at && new Date(poll.start_at) > nowUtc) {
+        throw createError('Survey has not started yet', 403);
+      }
+      if (poll.end_at && new Date(poll.end_at) < nowUtc) {
+        throw createError('Survey has already ended', 403);
+      }
+
       // Check nullifier (prevent double submission)
       const nullifierCheck = await pool.query(
         'SELECT 1 FROM survey_nullifiers WHERE poll_id = $1 AND nullifier_hash = $2',
@@ -199,7 +208,6 @@ router.post(
       );
 
       // Check if poll has rewards configured
-      const poll = pollResult.rows[0];
       const hasReward = poll.reward_amount && parseFloat(poll.reward_amount) > 0;
       let rewardInfo = null;
 

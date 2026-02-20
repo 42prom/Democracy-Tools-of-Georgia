@@ -62,7 +62,16 @@ export async function submitVote(
 
   const poll = pollResult.rows[0];
 
-  // 3. Verify option exists for this poll
+  // 3. Check time-based eligibility (start_at/end_at)
+  const nowUtc = new Date();
+  if (poll.start_at && new Date(poll.start_at) > nowUtc) {
+    throw createError('Poll has not started yet', 403);
+  }
+  if (poll.end_at && new Date(poll.end_at) < nowUtc) {
+    throw createError('Poll has already ended', 403);
+  }
+
+  // 4. Verify option exists for this poll
   const optionResult = await query(
     'SELECT * FROM poll_options WHERE id = $1 AND poll_id = $2',
     [voteData.optionId, voteData.pollId]
