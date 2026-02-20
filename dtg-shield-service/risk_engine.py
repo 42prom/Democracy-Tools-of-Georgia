@@ -45,15 +45,36 @@ class RiskEngine:
         print(f"[SHIELD] BLOCKED IP {ip}: {reason}")
 
     async def is_ip_blocked(self, ip: str) -> tuple[bool, str]:
-        """Checks if an IP is blocked either by Shield or Backend rate limits."""
+        """Checks if an IP is blocked by Shield, Backend limits, or Geo-Blocking."""
         # 1. Check Shield direct block
         block_key = f"shield:block:{ip}"
         reason = await self.redis.get(block_key)
         if reason:
             return True, f"Shield Risk Block: {reason}"
             
-        # 2. Check traditional Auth/Biometric Backend limits
-        # We read the backend's Redis keys to enforce blocks at the edge via Proxy
+        # 2. Check Backend Geo-Blocking Synchronization
+        # Read the same keys used by Node.js backend
+        try:
+            geo_settings_raw = await self.redis.get("geo:settings")
+            if geo_settings_raw:
+                geo_settings = json.loads(geo_settings_raw)
+                if geo_settings.get("geo_blocking_enabled") == "true":
+                    # Check if country is blocked
+                    # First check if we have cached geo info for this IP
+                    geo_info_raw = await self.redis.get(f"geo:ip:{ip}")
+                    if geo_info_raw:
+                        geo_info = json.loads(geo_info_raw)
+                        country_code = geo_info.get("country_code")
+                        if country_code:
+                            blocked_countries_raw = await self.redis.get("geo:blocked_countries")
+                            if blocked_countries_raw:
+                                blocked_countries = json.loads(blocked_countries_raw)
+                                if country_code.upper() in [c.upper() for c in blocked_countries]:
+                                    return True, f"Geo-Blocked: {country_code} is restricted"
+        except Exception as e:
+            print(f"[SHIELD] Geo-sync error: {e}")
+
+        # 3. Check traditional Auth/Biometric Backend limits
         auth_keys = [
             f"rl:login:ip:{ip}", 
             f"rl:enrollment:ip:{ip}",
@@ -61,10 +82,8 @@ class RiskEngine:
         ]
         
         for key in auth_keys:
-            # Check length of the sorted set storing failed attempts
             count = await self.redis.zcard(key)
-            if count and count >= 50: # Default backend upper limit heuristic
-                # Penalize and block at gateway edge
+            if count and count >= 50:
                 await self.increment_risk(ip, int(count), "Excessive backend rate limit failures detected at Edge")
                 return True, "Edge proxy detected heavy backend failure rate"
                 
