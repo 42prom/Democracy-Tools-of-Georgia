@@ -155,6 +155,21 @@ interface BlockedLog {
   attempted_at: string;
 }
 
+interface TestResult {
+  ip?: string;
+  geo?: {
+    country_code: string;
+    country_name: string;
+    city?: string;
+    region?: string;
+  };
+  block_status?: {
+    blocked: boolean;
+    reason?: string;
+  };
+  error?: string;
+}
+
 interface Stats {
   total_blocked: number;
   unique_ips: number;
@@ -201,7 +216,7 @@ export default function SettingsGeoBlocking() {
   const [newWhitelist, setNewWhitelist] = useState({ ip: '', description: '' });
   const [searchCountry, setSearchCountry] = useState('');
   const [testIP, setTestIP] = useState('');
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testLoading, setTestLoading] = useState(false);
 
   const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
@@ -232,8 +247,8 @@ export default function SettingsGeoBlocking() {
       if (whitelistRes.ok) setWhitelist(await whitelistRes.json());
       if (logsRes.ok) setLogs(await logsRes.json());
       if (statsRes.ok) setStats(await statsRes.json());
-    } catch (err: any) {
-      setError(err.message || 'Failed to load geo-blocking data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load geo-blocking data');
     } finally {
       setLoading(false);
     }
@@ -259,8 +274,8 @@ export default function SettingsGeoBlocking() {
       setSettings(data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update settings');
     } finally {
       setSaving(false);
     }
@@ -287,8 +302,8 @@ export default function SettingsGeoBlocking() {
 
       setNewCountry({ code: '', name: '', reason: '' });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to block country');
     }
   }
 
@@ -299,8 +314,8 @@ export default function SettingsGeoBlocking() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to unblock country');
     }
   }
 
@@ -325,8 +340,8 @@ export default function SettingsGeoBlocking() {
 
       setNewIP({ ip: '', reason: '', expires: '' });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to block IP');
     }
   }
 
@@ -337,8 +352,8 @@ export default function SettingsGeoBlocking() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to unblock IP');
     }
   }
 
@@ -362,8 +377,8 @@ export default function SettingsGeoBlocking() {
 
       setNewWhitelist({ ip: '', description: '' });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add to whitelist');
     }
   }
 
@@ -374,8 +389,8 @@ export default function SettingsGeoBlocking() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to remove from whitelist');
     }
   }
 
@@ -397,8 +412,8 @@ export default function SettingsGeoBlocking() {
 
       const data = await response.json();
       setTestResult(data);
-    } catch (err: any) {
-      setTestResult({ error: err.message });
+    } catch (err: unknown) {
+      setTestResult({ error: err instanceof Error ? err.message : 'Test failed' });
     } finally {
       setTestLoading(false);
     }
@@ -539,7 +554,7 @@ export default function SettingsGeoBlocking() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'countries' | 'ips' | 'whitelist' | 'logs' | 'test')}
                   className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-primary-500 text-primary-600'
