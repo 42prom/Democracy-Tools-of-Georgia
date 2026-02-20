@@ -13,6 +13,7 @@ import {
   MessageSquare,
   LogOut,
   Ticket,
+  Activity,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -26,7 +27,7 @@ const navigationItems = [
   { path: '/messages', label: 'Messages', icon: MessageSquare },
   { path: '/tickets', label: 'Support', icon: Ticket },
   { path: '/profiles', label: 'Profiles', icon: Users },
-  { path: '/logs', label: 'Logs', icon: Shield },
+  { path: '/logs', label: 'Logs', icon: Activity },
   { path: '/shield', label: 'Shield', icon: Shield },
   { path: '/settings/regions', label: 'Settings', icon: Settings },
 ];
