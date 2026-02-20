@@ -109,8 +109,6 @@ class RiskEngine:
                 sec_settings = json.loads(sec_settings_raw)
 
                 # 3a. Device Attestation check (Root/Jailbreak)
-                # If attestation is required and the request has no X-Attestation-Token header,
-                # we increment risk rather than hard-block (backend validates the token content).
                 if sec_settings.get("require_device_attestation") == "true":
                     if request is not None:
                         attestation_token = request.headers.get("x-attestation-token")
@@ -119,13 +117,27 @@ class RiskEngine:
                                 ip, 20,
                                 "Missing device attestation token (Root/Jailbreak suspected)"
                             )
-                            # Re-check if this increment triggered a block
                             reason = await self.redis.get(f"shield:block:{ip}")
                             if reason:
                                 return True, f"Shield Risk Block: {reason}"
 
-                # 3b. Biometric IP throttle synchronization
-                # The backend limit is read from the security settings
+                # 3b. VPN / Proxy blocking (synced from Admin Security Policies page)
+                if sec_settings.get("block_vpn_and_proxy") == "true":
+                    try:
+                        import httpx as _httpx
+                        async with _httpx.AsyncClient(timeout=3.0) as _c:
+                            r = await _c.get(
+                                f"http://ip-api.com/json/{ip}?fields=status,proxy,hosting,query"
+                            )
+                            data = r.json()
+                            if data.get("status") == "success":
+                                if data.get("proxy") or data.get("hosting"):
+                                    print(f"[SHIELD] VPN/PROXY BLOCKED: {ip} (proxy={data.get('proxy')}, hosting={data.get('hosting')})")
+                                    return True, f"Security Policy: VPN/Proxy/Datacenter traffic blocked"
+                    except Exception as vpn_err:
+                        print(f"[SHIELD] VPN check failed for {ip}: {vpn_err}")
+
+                # 3c. Biometric IP throttle synchronization
                 max_bio = int(sec_settings.get("max_biometric_attempts_per_ip", 10))
                 bio_count = await self.redis.zcard(f"rl:biometric:ip:{ip}")
                 if bio_count and bio_count >= max_bio:
