@@ -36,6 +36,18 @@ const QUESTION_TYPE_OPTIONS = [
 
 type EstimateState = 'idle' | 'loading' | 'safe' | 'unsafe';
 
+// Helper to convert Date to YYYY-MM-DDTHH:MM in local timezone
+const toLocalISOString = (dateStr?: string | Date) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+};
+
 export default function CreatePoll() {
   const { id: pollId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -137,10 +149,10 @@ export default function CreatePoll() {
       );
 
       if (poll.start_at) {
-        setStartDate(new Date(poll.start_at).toISOString().slice(0, 16));
+        setStartDate(toLocalISOString(poll.start_at));
       }
       if (poll.end_at) {
-        setEndDate(new Date(poll.end_at).toISOString().slice(0, 16));
+        setEndDate(toLocalISOString(poll.end_at));
       }
 
       // Audience rules
@@ -336,8 +348,8 @@ export default function CreatePoll() {
         description: description || undefined,
         type: pollType,
         audience_rules: getAudienceRules(),
-        start_at: startDate || undefined,
-        end_at: endDate || undefined,
+        start_at: startDate ? new Date(startDate).toISOString() : undefined,
+        end_at: endDate ? new Date(endDate).toISOString() : undefined,
         rewards_enabled: rewardsEnabled,
         reward_amount: rewardsEnabled && rewardAmount ? parseFloat(rewardAmount) : undefined,
         reward_token: rewardsEnabled ? rewardToken : undefined,
@@ -399,8 +411,8 @@ export default function CreatePoll() {
         description: description || undefined,
         type: pollType,
         audience_rules: getAudienceRules(),
-        start_at: startDate || undefined,
-        end_at: endDate || undefined,
+        start_at: startDate ? new Date(startDate).toISOString() : undefined,
+        end_at: endDate ? new Date(endDate).toISOString() : undefined,
         rewards_enabled: rewardsEnabled,
         reward_amount: rewardsEnabled && rewardAmount ? parseFloat(rewardAmount) : undefined,
         reward_token: rewardsEnabled ? rewardToken : undefined,
