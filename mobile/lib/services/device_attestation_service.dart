@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:logging/logging.dart';
 
 /// Device Attestation Service
 /// ============================================================
@@ -15,6 +16,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 /// ============================================================
 class DeviceAttestationService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  static final Logger _log = Logger('DeviceAttestationService');
 
   /// Get the platform name for this device
   static String get platform => Platform.isAndroid ? 'android' : 'ios';
@@ -61,7 +63,7 @@ class DeviceAttestationService {
       // Placeholder for development builds:
       return 'DEV_ANDROID_${androidInfo.fingerprint.hashCode}_${nonce.substring(0, 8)}';
     } catch (e) {
-      print('[DeviceAttestation] Android attestation error: $e');
+      _log.warning('[DeviceAttestation] Android attestation error: $e');
       return null;
     }
   }
@@ -90,7 +92,7 @@ class DeviceAttestationService {
       // Placeholder for development builds:
       return 'DEV_IOS_${iosInfo.identifierForVendor?.hashCode ?? 0}';
     } catch (e) {
-      print('[DeviceAttestation] iOS attestation error: $e');
+      _log.warning('[DeviceAttestation] iOS attestation error: $e');
       return null;
     }
   }
