@@ -485,6 +485,23 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
     clearRateLimitCache();
     console.log('[Admin] Rate limit settings cache cleared');
 
+    // === SHIELD SYNCHRONIZATION ===
+    // Publish security and geo settings to Redis so the Shield Gateway
+    // can enforce them at the edge (Port 8080) without hitting the backend.
+    try {
+      const redisClient = (await import('../../db/redis')).default;
+      const securityPayload = {
+        block_vpn_and_proxy: String(merged.security.blockVpnAndProxy),
+        require_device_attestation: String(merged.security.requireDeviceAttestationForVote),
+        max_biometric_attempts_per_ip: String(merged.security.maxBiometricAttemptsPerIP),
+        biometric_window_minutes: String(merged.security.biometricIPLimitWindowMinutes),
+      };
+      await redisClient.setEx('security:settings', 300, JSON.stringify(securityPayload));
+      console.log('[Admin] Security settings synced to Shield via Redis:', securityPayload);
+    } catch (e) {
+      console.warn('[Admin] Could not sync security settings to Shield Redis (non-fatal):', e);
+    }
+
     const updated = await loadFullConfig();
     return res.json(updated);
   } catch (error) {

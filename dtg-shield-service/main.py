@@ -44,7 +44,7 @@ async def shield_middleware(request: Request, call_next):
     # 2. Heuristic Analysis - Check if blocked by Shield Risk Engine
     start_time = time.time()
     
-    is_blocked, reason = await risk_engine.is_ip_blocked(client_ip)
+    is_blocked, reason = await risk_engine.is_ip_blocked(client_ip, request=request)
     
     if is_blocked:
         return JSONResponse(
