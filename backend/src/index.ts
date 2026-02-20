@@ -181,6 +181,28 @@ async function startServer() {
       // process.exit(1); // Optional: Un-comment if you want strict failure
     }
 
+    // === SHIELD STARTUP SYNCHRONIZATION ===
+    try {
+      console.log('[Startup] Syncing security policies to Shield Gateway...');
+      const { GeoBlockingService } = await import('./services/geoBlocking');
+      await GeoBlockingService.syncToRedis();
+      
+      // Also sync general security settings
+      const { loadFullConfig } = await import('./routes/admin/settings');
+      const config = await loadFullConfig();
+      const redisClient = (await import('./db/redis')).default;
+      const securityPayload = {
+        block_vpn_and_proxy: String(config.security.blockVpnAndProxy),
+        require_device_attestation: String(config.security.requireDeviceAttestationForVote),
+        max_biometric_attempts_per_ip: String(config.security.maxBiometricAttemptsPerIP),
+        biometric_window_minutes: String(config.security.biometricIPLimitWindowMinutes),
+      };
+      await redisClient.set('security:settings', JSON.stringify(securityPayload));
+      console.log('✓ Shield Gateway synchronized');
+    } catch (err) {
+      console.warn('⚠️  Warning: Shield synchronization failed during startup:', err);
+    }
+
     // Start Express server
     const server = app.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT}`);

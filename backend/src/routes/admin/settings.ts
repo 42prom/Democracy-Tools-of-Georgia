@@ -74,7 +74,7 @@ function maskApiKey(apiKey: string): string {
  * Load full configuration (Verification + Blockchain).
  * This is the source of truth for admin settings endpoints.
  */
-async function loadFullConfig() {
+export async function loadFullConfig(): Promise<any> {
   const result = await pool.query(
     `SELECT key, value FROM settings WHERE key LIKE 'verification_%' OR key LIKE 'blockchain_%' OR key LIKE 'security_%' OR key LIKE 'push_%'`
   );
@@ -496,7 +496,7 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
         max_biometric_attempts_per_ip: String(merged.security.maxBiometricAttemptsPerIP),
         biometric_window_minutes: String(merged.security.biometricIPLimitWindowMinutes),
       };
-      await redisClient.setEx('security:settings', 300, JSON.stringify(securityPayload));
+      await redisClient.set('security:settings', JSON.stringify(securityPayload));
       console.log('[Admin] Security settings synced to Shield via Redis:', securityPayload);
     } catch (e) {
       console.warn('[Admin] Could not sync security settings to Shield Redis (non-fatal):', e);

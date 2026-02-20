@@ -7,7 +7,7 @@ import { pool } from '../db/client';
 import redisClient from '../db/redis';
 
 const CACHE_PREFIX = 'geo:';
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL_GEO_INFO = 3600; // 1 hour for IP lookup info (dynamic)
 
 interface GeoInfo {
   ip: string;
@@ -45,7 +45,8 @@ export class GeoBlockingService {
     result.rows.forEach(row => { settings[row.key] = row.value; });
 
     try {
-      await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(settings));
+      // For Shield gateway, we use persistent keys (no TTL)
+      await redisClient.set(cacheKey, JSON.stringify(settings));
     } catch (e) {
       // Redis not available
     }
@@ -61,11 +62,8 @@ export class GeoBlockingService {
       [key, value]
     );
 
-    try {
-      await redisClient.del(`${CACHE_PREFIX}settings`);
-    } catch (e) {
-      // Redis not available
-    }
+    // Push update to Redis immediately for Shield synchronization
+    await this.syncToRedis();
   }
 
   // =========================================================================
@@ -123,7 +121,7 @@ export class GeoBlockingService {
 
       if (geoInfo) {
         try {
-          await redisClient.setEx(cacheKey, CACHE_TTL * 12, JSON.stringify(geoInfo));
+          await redisClient.setEx(cacheKey, CACHE_TTL_GEO_INFO, JSON.stringify(geoInfo));
         } catch (e) {
           // Redis not available
         }
@@ -200,10 +198,10 @@ export class GeoBlockingService {
     const result = await pool.query(
       'SELECT country_code FROM blocked_countries WHERE is_active = TRUE'
     );
-    blockedCodes = result.rows.map(r => r.country_code);
+    blockedCodes = result.rows.map(r => r.country_code.toUpperCase());
 
     try {
-      await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(blockedCodes));
+      await redisClient.set(cacheKey, JSON.stringify(blockedCodes));
     } catch (e) {
       // Redis not available
     }
@@ -280,11 +278,7 @@ export class GeoBlockingService {
       [countryCode.toUpperCase(), countryName, reason, blockedBy]
     );
 
-    try {
-      await redisClient.del(`${CACHE_PREFIX}blocked_countries`);
-    } catch (e) {
-      // Redis not available
-    }
+    await this.syncToRedis();
   }
 
   static async unblockCountry(countryCode: string): Promise<void> {
@@ -293,11 +287,7 @@ export class GeoBlockingService {
       [countryCode.toUpperCase()]
     );
 
-    try {
-      await redisClient.del(`${CACHE_PREFIX}blocked_countries`);
-    } catch (e) {
-      // Redis not available
-    }
+    await this.syncToRedis();
   }
 
   static async deleteCountry(countryCode: string): Promise<void> {
@@ -306,11 +296,7 @@ export class GeoBlockingService {
       [countryCode.toUpperCase()]
     );
 
-    try {
-      await redisClient.del(`${CACHE_PREFIX}blocked_countries`);
-    } catch (e) {
-      // Redis not available
-    }
+    await this.syncToRedis();
   }
 
   // =========================================================================
@@ -442,8 +428,32 @@ export class GeoBlockingService {
     try {
       await redisClient.del(`${CACHE_PREFIX}settings`);
       await redisClient.del(`${CACHE_PREFIX}blocked_countries`);
+      await this.syncToRedis();
     } catch (e) {
       // Redis not available
+    }
+  }
+
+  /**
+   * Pushes current DB state for Geo-Blocking to Redis.
+   * This is used by the Shield Gateway to enforce rules.
+   */
+  static async syncToRedis(): Promise<void> {
+    try {
+      // 1. Sync Settings
+      const settings = await this.getSettings();
+      await redisClient.set(`${CACHE_PREFIX}settings`, JSON.stringify(settings));
+
+      // 2. Sync Blocked Countries
+      const result = await pool.query(
+        'SELECT country_code FROM blocked_countries WHERE is_active = TRUE'
+      );
+      const blockedCodes = result.rows.map(r => r.country_code.toUpperCase());
+      await redisClient.set(`${CACHE_PREFIX}blocked_countries`, JSON.stringify(blockedCodes));
+      
+      console.log('[GeoBlocking] Synced settings and blocked countries to Redis for Shield');
+    } catch (err) {
+      console.warn('[GeoBlocking] Failed to sync to Redis:', err);
     }
   }
 }
