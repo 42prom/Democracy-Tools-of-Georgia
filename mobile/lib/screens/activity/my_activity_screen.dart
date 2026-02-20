@@ -6,6 +6,7 @@ import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
 import '../../services/localization_service.dart';
 import 'activity_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class MyActivityScreen extends StatefulWidget {
   const MyActivityScreen({super.key});
@@ -246,6 +247,6 @@ class _ActivityTile extends StatelessWidget {
   }
 
   String _formatDate(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return DateFormat.yMMMd().add_Hm().format(dt.toLocal());
   }
 }

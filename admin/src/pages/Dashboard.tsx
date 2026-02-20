@@ -4,6 +4,7 @@ import { FileText, CheckCircle, Archive, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { adminPollsApi } from '../api/client';
+import { formatDate } from '../utils/format';
 import type { Poll } from '../types';
 
 interface PollStats {
@@ -182,7 +183,7 @@ export default function Dashboard() {
                       {poll.options.length} options
                     </span>
                     <span className="text-sm text-gray-500">
-                      Created {new Date(poll.created_at).toLocaleDateString()}
+                      Created {formatDate(poll.created_at)}
                     </span>
                   </div>
                 </div>

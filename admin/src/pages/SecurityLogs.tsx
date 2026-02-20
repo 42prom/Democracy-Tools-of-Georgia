@@ -3,6 +3,7 @@ import { Shield, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DateTimePicker24h from '../components/ui/DateTimePicker24h';
 import { securityEventsApi } from '../api/client';
+import { formatDate } from '../utils/format';
 import type { SecurityEventsSummary } from '../types';
 import { clsx } from 'clsx';
 
@@ -223,12 +224,12 @@ export default function SecurityLogs() {
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {event.firstSeen
-                          ? new Date(event.firstSeen).toLocaleString(undefined, { hour12: false })
+                          ? formatDate(event.firstSeen)
                           : '-'}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {event.lastSeen
-                          ? new Date(event.lastSeen).toLocaleString(undefined, { hour12: false })
+                          ? formatDate(event.lastSeen)
                           : '-'}
                       </td>
                     </tr>
@@ -247,8 +248,8 @@ export default function SecurityLogs() {
 
           {/* Time Range */}
           <div className="mt-4 text-sm text-gray-500 text-center">
-            Time range: {new Date(summary.metadata.timeRange.start).toLocaleString(undefined, { hour12: false })} -{' '}
-            {new Date(summary.metadata.timeRange.end).toLocaleString(undefined, { hour12: false })}
+            Time range: {formatDate(summary.metadata.timeRange.start)} -{' '}
+            {formatDate(summary.metadata.timeRange.end)}
           </div>
         </>
       ) : (

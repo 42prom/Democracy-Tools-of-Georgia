@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/activity_item.dart';
 import '../../services/service_locator.dart';
 import '../../services/localization_service.dart';
+import 'package:intl/intl.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final ActivityItem item;
@@ -559,8 +561,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   String _formatDateTime(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return DateFormat.yMMMd().add_Hm().format(dt.toLocal());
   }
 
   String _formatEndsAt(String iso) {
@@ -633,7 +634,7 @@ class _DonutChartPainter extends CustomPainter {
           fontWeight: FontWeight.bold,
         ),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     );
     textPainter.layout();
     textPainter.paint(
@@ -649,7 +650,7 @@ class _DonutChartPainter extends CustomPainter {
         text: 'votes',
         style: TextStyle(color: Colors.grey, fontSize: 12),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     );
     labelPainter.layout();
     labelPainter.paint(

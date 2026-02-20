@@ -68,7 +68,7 @@ class _ReferendumScreenState extends State<ReferendumScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${loc.translate('poll_ends')} ${DateFormat.yMMMd().format(DateTime.parse(widget.poll.endAt!))}',
+                            '${loc.translate('poll_ends')} ${DateFormat.yMMMd().add_Hm().format(DateTime.parse(widget.poll.endAt!).toLocal())}',
                             style: const TextStyle(
                               color: Colors.grey,
                               fontWeight: FontWeight.w500,

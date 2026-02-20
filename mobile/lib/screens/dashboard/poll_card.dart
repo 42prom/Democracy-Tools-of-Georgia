@@ -5,6 +5,7 @@ import '../../models/poll.dart';
 import '../voting/poll_details_screen.dart';
 import '../voting/survey_screen.dart';
 import '../voting/referendum_screen.dart';
+import 'package:intl/intl.dart';
 
 class PollCard extends StatelessWidget {
   final Poll poll;
@@ -53,6 +54,21 @@ class PollCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (poll.endAt != null) ...[
+                  const Spacer(),
+                  const Icon(Icons.access_time, size: 12, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat.yMMMd().add_Hm().format(
+                      DateTime.parse(poll.endAt!).toLocal(),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),

@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import ReferendumResults from '../components/ReferendumResults';
 import DemographicsCharts from '../components/analytics/DemographicsCharts';
 import { adminPollsApi, analyticsApi } from '../api/client';
+import { formatDate } from '../utils/format';
 import type { Poll, PollResults, SurveyResultsResponse } from '../types';
 
 export default function PollDetails() {
@@ -151,9 +152,9 @@ export default function PollDetails() {
                 Duration
               </div>
               <p className="text-sm text-gray-900">
-                {poll.start_at && `Starts: ${new Date(poll.start_at).toLocaleString(undefined, { hour12: false })}`}
+                {poll.start_at && `Starts: ${formatDate(poll.start_at)}`}
                 <br />
-                {poll.end_at && `Ends: ${new Date(poll.end_at).toLocaleString(undefined, { hour12: false })}`}
+                {poll.end_at && `Ends: ${formatDate(poll.end_at)}`}
               </p>
             </div>
 
