@@ -42,6 +42,7 @@ import adminMessagesRouter from './routes/admin/messages';
 import adminSecurityRouter from './routes/admin/security';
 import adminTicketsRouter from './routes/admin/tickets';
 import adminGeoBlockingRouter from './routes/admin/geoBlocking';
+import adminShieldRouter from './routes/admin/shield';
 import statsRouter from './routes/stats';
 import ticketsRouter from './routes/tickets';
 
@@ -129,6 +130,7 @@ app.use('/api/v1/admin/messages', adminMessagesRouter);
 app.use('/api/v1/admin/security-events', adminSecurityRouter);
 app.use('/api/v1/admin/tickets', adminTicketsRouter);
 app.use('/api/v1/admin/geo-blocking', adminGeoBlockingRouter);
+app.use('/api/v1/admin/shield', adminShieldRouter);
 app.use('/api/v1/stats', statsRouter);
 app.use('/api/v1/tickets', ticketsRouter);
 app.use('/api/v1/analytics', statsRouter); // Analytics endpoint (alias for stats)
@@ -150,7 +152,7 @@ app.use(errorHandler);
 async function startServer() {
   try {
     // Validate environment configuration
-    validateEnvironment();
+    await validateEnvironment();
     
     // Connect to Redis
     await connectRedis();
@@ -231,7 +233,7 @@ async function shutdown() {
       PollStatusMonitor.stop();
       VoteAnchorService.stop();
       await pushService.shutdown();
-    } catch (e) {}
+    } catch (e) { console.warn('[Shutdown] Non-critical error stopping services:', e); }
 
     console.log('✓ Connections closed');
     process.exit(0);
@@ -244,7 +246,7 @@ async function shutdown() {
 /**
  * Validate environment configuration
  */
-function validateEnvironment() {
+async function validateEnvironment() {
   console.log('[Startup] Validating environment configuration...');
   
   const bioServiceUrl = AppConfig.BIOMETRIC.URL;
@@ -257,12 +259,13 @@ function validateEnvironment() {
   // JWT Secret validation is now handled by getJwtSecret() in secrets.ts called by auth middleware
   // We can double check here if we want, or rely on config/secrets to throw early
   try {
-    const secrets = require('./config/secrets');
-    secrets.getJwtSecret();
-    secrets.getPnHashSecret();
-    secrets.getApiKeyEncryptionSecret();
-  } catch (err: any) {
-    console.error(`❌ FATAL: ${err.message}`);
+    const { getJwtSecret, getPnHashSecret, getApiKeyEncryptionSecret } = await import('./config/secrets');
+    getJwtSecret();
+    getPnHashSecret();
+    getApiKeyEncryptionSecret();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ FATAL: ${msg}`);
     process.exit(1);
   }
 }

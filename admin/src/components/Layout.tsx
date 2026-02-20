@@ -27,6 +27,7 @@ const navigationItems = [
   { path: '/tickets', label: 'Support', icon: Ticket },
   { path: '/profiles', label: 'Profiles', icon: Users },
   { path: '/logs', label: 'Logs', icon: Shield },
+  { path: '/shield', label: 'Shield', icon: Shield },
   { path: '/settings/regions', label: 'Settings', icon: Settings },
 ];
 

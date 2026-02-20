@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import Layout from './components/Layout';
@@ -24,6 +24,7 @@ import MessagesList from './pages/MessagesList';
 import MessageEditor from './pages/MessageEditor';
 import Tickets from './pages/Tickets';
 import TicketDetail from './pages/TicketDetail';
+import ShieldDashboard from './pages/ShieldDashboard';
 
 function hasAdminToken() {
   return !!(localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken'));
@@ -68,6 +69,7 @@ function App() {
           <Route path="messages/create" element={<MessageEditor />} />
           <Route path="messages/:id/edit" element={<MessageEditor />} />
           <Route path="logs" element={<SecurityLogs />} />
+          <Route path="shield" element={<ShieldDashboard />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
 

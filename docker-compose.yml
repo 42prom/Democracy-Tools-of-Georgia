@@ -57,6 +57,27 @@ services:
       start_period: 30s
     restart: always
 
+  dtg-shield-service:
+    build: ./dtg-shield-service
+    container_name: dtg-shield-service
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_URL=http://host.docker.internal:3000
+      - BLOCK_THRESHOLD=100
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: always
+
 volumes:
   postgres_data:
   redis_data:

@@ -11,6 +11,7 @@ Built on a custom **Flagship++ Protocol (designed by Mikheili Nakeuri)**, this s
 - **Biometric Identity Verification**: AI-powered Face Matching & Liveness Detection.
 - **eMRTD/NFC Scanning**: Passport/ID chip reading (ISO/IEC 14443).
 - **Blockchain Immutability**: Tamper-proof voting records.
+- **Autonomous Security Shield**: AI-powered adaptive rate limiting and edge protection.
 - **Enterprise Security**: Rate limits, Geo-blocking, and strict CORS policies.
 
 ---
@@ -30,8 +31,11 @@ Built on a custom **Flagship++ Protocol (designed by Mikheili Nakeuri)**, this s
 - **Audience Filtering**: Target voters by age, region, and custom demographics.
 - **Immutable Receipts**: Voters receive cryptographic proof of their vote.
 
-### � Enterprise Security
+### 🛡️ Autonomous Security
 
+- **Adaptive Shield**: A standalone Python gateway that scores IP risk in real-time.
+- **Edge Rejection**: Drops high-risk traffic before it even reaches the core backend.
+- **Subnet Heuristics**: Automatically detects and alerts on clustered attack patterns.
 - **Defense in Depth**:
   - **Static Rate Limiting**: 60 req/min (Auth), 300 req/min (API).
   - **Dynamic Protection**: Auto-ban IPs after repeated login/liveness failures.
@@ -47,6 +51,7 @@ Built on a custom **Flagship++ Protocol (designed by Mikheili Nakeuri)**, this s
 | **Backend**    | Node.js, TypeScript, Express, Helmet, CORS                            |
 | **Database**   | PostgreSQL 15 (with GIN Indexes for Analytics), Redis (Rate Limiting) |
 | **Biometrics** | Python, FastAPI, InsightFace / FaceNet                                |
+| **Security**   | Python (FastAPI), Redis, CIDR Heuristics                              |
 | **DevOps**     | Docker Compose, Multi-stage builds                                    |
 
 ---
@@ -151,11 +156,14 @@ To mitigate the risk of device theft or unauthorized access, the system enforces
 
 ```mermaid
 graph TD
-    User[Mobile App User] -->|HTTPS| API[Express API Gateway]
-    API -->|Auth Check| Redis[Redis Cache]
+    User[Mobile App User] -->|Port 8080| Shield[dtg-shield-service]
+    Shield -->|Reverse Proxy| API[Express API Gateway]
+    Shield -->|Read/Write Score| Redis[Redis Cache]
+    API -->|Auth Check| Redis
     API -->|Store Data| DB[PostgreSQL]
     API -->|Verify| Bio[Biometric Service]
     API -->|Log| Logger[JSON Logger]
+    Auto[AutoManager Loop] -->|Prune & Alert| Redis
 ```
 
 ---
@@ -180,7 +188,7 @@ graph TD
 2.  **Start Infrastructure (Postgres, Redis)**
 
     ```bash
-    docker-compose up -d postgres redis
+    docker-compose up -d postgres redis biometric-service dtg-shield-service
     ```
 
 3.  **Setup & Run Backend**

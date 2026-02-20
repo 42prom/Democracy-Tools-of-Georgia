@@ -72,6 +72,10 @@ brain/
 .insightface/
 __pycache__/
 *.pyc
+venv/
+.venv/
+env/
+.env/
 
 # Mobile build artifacts
 mobile/build/
@@ -111,3 +115,7 @@ FLAGSHIP_AUDIT_REPORT.md
 final_clean_flagship.md
 analyze_stabilization.md
 clean_up.md
+backend/tsc_*.txt
+backend/tsc_*.log
+.coverage
+htmlcov/
