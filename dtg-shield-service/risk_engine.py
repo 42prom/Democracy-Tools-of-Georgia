@@ -71,16 +71,34 @@ class RiskEngine:
             if geo_settings_raw:
                 geo_settings = json.loads(geo_settings_raw)
                 if geo_settings.get("geo_blocking_enabled") == "true":
-                    geo_info_raw = await self.redis.get(f"geo:ip:{ip}")
-                    if geo_info_raw:
-                        geo_info = json.loads(geo_info_raw)
-                        country_code = geo_info.get("country_code")
-                        if country_code:
-                            blocked_countries_raw = await self.redis.get("geo:blocked_countries")
-                            if blocked_countries_raw:
-                                blocked_countries = json.loads(blocked_countries_raw)
-                                if country_code.upper() in [c.upper() for c in blocked_countries]:
-                                    return True, f"Geo-Blocked: {country_code} is restricted"
+                    blocked_countries_raw = await self.redis.get("geo:blocked_countries")
+                    if blocked_countries_raw:
+                        blocked_countries = json.loads(blocked_countries_raw)
+                        if blocked_countries:  # Only check if there are actual blocked countries
+                            # Try cached geo info first
+                            country_code = None
+                            geo_info_raw = await self.redis.get(f"geo:ip:{ip}")
+                            if geo_info_raw:
+                                geo_info = json.loads(geo_info_raw)
+                                country_code = geo_info.get("country_code")
+                            else:
+                                # No cache: do a live lookup directly in the Shield
+                                try:
+                                    import httpx as _httpx
+                                    async with _httpx.AsyncClient(timeout=3.0) as _c:
+                                        r = await _c.get(f"http://ip-api.com/json/{ip}?fields=status,countryCode")
+                                        data = r.json()
+                                        if data.get("status") == "success":
+                                            country_code = data.get("countryCode")
+                                            # Cache for 1 hour to avoid repeated lookups
+                                            geo_payload = json.dumps({"country_code": country_code, "ip": ip})
+                                            await self.redis.setex(f"geo:ip:{ip}", 3600, geo_payload)
+                                except Exception as lookup_err:
+                                    print(f"[SHIELD] Live geo-lookup failed for {ip}: {lookup_err}")
+
+                            if country_code and country_code.upper() in [c.upper() for c in blocked_countries]:
+                                print(f"[SHIELD] GEO-BLOCKED: {ip} from {country_code}")
+                                return True, f"Geo-Blocked: {country_code} is restricted"
         except Exception as e:
             print(f"[SHIELD] Geo-sync error: {e}")
 
