@@ -12,6 +12,31 @@ import RegionSelector from '../components/ui/RegionSelector';
 import { adminMessagesApi, regionsApi } from '../api/client';
 import type { MessageType, Region } from '../types';
 
+// Helper to convert Date to YYYY-MM-DDTHH:MM in local timezone
+const toLocalISOString = (dateStr?: string | Date) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+};
+
+// Helper to reliably convert local YYYY-MM-DDTHH:MM string to UTC ISO string
+const toUtcISOString = (localStr?: string) => {
+  if (!localStr) return undefined;
+  const [datePart, timePart] = localStr.split('T');
+  if (!datePart || !timePart) return undefined;
+  
+  const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+  const [hours, mins] = timePart.split(':').map(num => parseInt(num, 10));
+  
+  const date = new Date(year, month - 1, day, hours, mins);
+  return isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 export default function MessageEditor() {
   const { id: messageId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -60,8 +85,8 @@ export default function MessageEditor() {
       setTitle(msg.title);
       setBody(msg.body || '');
       setMessageType(msg.type);
-      setPublishAt(msg.publish_at || '');
-      setExpireAt(msg.expire_at || '');
+      setPublishAt(toLocalISOString(msg.publish_at));
+      setExpireAt(toLocalISOString(msg.expire_at));
 
       const rules = msg.audience_rules || {};
       if (rules.min_age || rules.max_age) {
@@ -102,8 +127,8 @@ export default function MessageEditor() {
         body,
         type: messageType,
         audience_rules: buildAudienceRules(),
-        publish_at: publishAt || undefined,
-        expire_at: expireAt || undefined,
+        publish_at: toUtcISOString(publishAt),
+        expire_at: toUtcISOString(expireAt),
       };
 
       if (isEditing) {
@@ -131,8 +156,8 @@ export default function MessageEditor() {
         body,
         type: messageType,
         audience_rules: buildAudienceRules(),
-        publish_at: publishAt || undefined,
-        expire_at: expireAt || undefined,
+        publish_at: toUtcISOString(publishAt),
+        expire_at: toUtcISOString(expireAt),
       };
 
       if (!isEditing) {
