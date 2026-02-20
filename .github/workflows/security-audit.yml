@@ -1,0 +1,77 @@
+name: Security Dependency Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run every Monday at 08:00 UTC to catch newly disclosed CVEs
+    - cron: "0 8 * * 1"
+
+jobs:
+  audit-backend:
+    name: Backend (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      - name: Run npm audit
+        working-directory: ./backend
+        run: npm audit --audit-level=moderate
+        continue-on-error: false
+
+  audit-admin:
+    name: Admin Panel (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: ./admin
+        run: npm ci
+      - name: Run npm audit
+        working-directory: ./admin
+        run: npm audit --audit-level=moderate
+        continue-on-error: false
+
+  audit-shield:
+    name: Shield Service (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit shield service
+        working-directory: ./dtg-shield-service
+        run: pip-audit -r requirements.txt
+
+  summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [audit-backend, audit-admin, audit-shield]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "Backend: ${{ needs.audit-backend.result }}"
+          echo "Admin:   ${{ needs.audit-admin.result }}"
+          echo "Shield:  ${{ needs.audit-shield.result }}"
+          if [[ "${{ needs.audit-backend.result }}" == "failure" || \
+                "${{ needs.audit-admin.result }}" == "failure" || \
+                "${{ needs.audit-shield.result }}" == "failure" ]]; then
+            echo "❌ One or more security audits failed!"
+            exit 1
+          else
+            echo "✅ All security audits passed!"
+          fi

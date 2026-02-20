@@ -113,16 +113,48 @@ export async function submitVote(
   // A) Load Settings
   const settingsRes = await query("SELECT key, value FROM settings WHERE key LIKE 'security_%'");
   const settings = settingsRes.rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {} as any);
-  
+
   const requireAttestation = settings.security_require_device_attestation_for_vote === 'true';
 
-  // B) Optional Hardware Attestation Check
+  // B) Hardware Attestation Check (Google Play Integrity / Apple App Attest)
   if (requireAttestation) {
     if (!voteData.attestation?.token) {
-        throw createError('Security Policy: Hardware device attestation is required to vote in this poll.', 403);
+      throw createError('Security Policy: Hardware device attestation is required to vote.', 403);
     }
-    
-    // NOTE: In the future, we would use the DeviceAttestationService to verify the token here.
+
+    const { DeviceAttestationService } = await import('./deviceAttestation');
+    const platform = voteData.device?.platform || 'unknown';
+    const attestationResult = await DeviceAttestationService.verify(
+      platform,
+      'auto',
+      voteData.attestation.token,
+      voteData.nonce // Use the vote nonce to bind attestation to this specific request
+    );
+
+    if (!attestationResult.success) {
+      await SecurityService.logSecurityEvent('SIGNATURE_FAIL', {
+        reason: 'attestation_failed',
+        verdict: attestationResult.verdict,
+        detail: attestationResult.reason,
+        pollId: voteData.pollId,
+        platform,
+      });
+      throw createError(
+        `Security Policy: Device integrity check failed (${attestationResult.verdict}). Rooted or emulated devices are not permitted.`,
+        403
+      );
+    }
+
+    // Enforce minimum verdict from admin settings
+    const minimumVerdict = await DeviceAttestationService.getMinimumRequiredVerdict();
+    if (!DeviceAttestationService.meetsMinimum(attestationResult.verdict, minimumVerdict)) {
+      throw createError(
+        `Security Policy: Device does not meet minimum integrity requirement (required: ${minimumVerdict}, got: ${attestationResult.verdict}).`,
+        403
+      );
+    }
+
+    console.log(`[Voting] Attestation passed: platform=${platform}, verdict=${attestationResult.verdict}`);
   }
 
   // C) Device-Voter Limit Enforcement
