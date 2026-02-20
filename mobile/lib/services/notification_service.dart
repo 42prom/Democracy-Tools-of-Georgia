@@ -109,6 +109,19 @@ class NotificationService {
     }
   }
 
+  /// Check the current authorization status from FCM
+  Future<AuthorizationStatus> getPermissionStatus() async {
+    final settings = await _fcm.getNotificationSettings();
+    return settings.authorizationStatus;
+  }
+
+  /// Helper to check if notifications are allowed at the system level
+  Future<bool> isPermissionGranted() async {
+    final status = await getPermissionStatus();
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+  }
+
   Future<void> registerDevice() async {
     try {
       String? token = await _fcm.getToken();

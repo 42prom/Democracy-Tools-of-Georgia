@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../config/app_config.dart';
 import '../../services/storage_service.dart';
 import '../../services/localization_service.dart';
+import '../../services/notification_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -42,8 +43,13 @@ class _NotificationSettingsScreenState
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final bool systemGranted = await NotificationService()
+            .isPermissionGranted();
+
         setState(() {
-          _notificationsEnabled = data['notifications_enabled'] ?? true;
+          // If system permission is denied, we must consider notifications disabled
+          _notificationsEnabled =
+              (data['notifications_enabled'] ?? true) && systemGranted;
           _pollsEnabled = data['polls_enabled'] ?? true;
           _messagesEnabled = data['messages_enabled'] ?? true;
         });
@@ -73,6 +79,22 @@ class _NotificationSettingsScreenState
     });
 
     try {
+      // If turning ON notifications, we MUST ensure system permission is granted
+      if (key == 'notifications_enabled' && value == true) {
+        final ns = NotificationService();
+        await ns.requestPermission();
+        final granted = await ns.isPermissionGranted();
+
+        if (!granted) {
+          // User denied permission at system level, rollback UI
+          setState(() {
+            _notificationsEnabled = false;
+          });
+          setState(() => _saving = false);
+          return;
+        }
+      }
+
       final credential = await _storageService.getCredential();
       final response = await http.patch(
         Uri.parse('${AppConfig.apiBaseUrl}/profile/me'),
@@ -85,6 +107,15 @@ class _NotificationSettingsScreenState
 
       if (response.statusCode != 200) {
         throw Exception('Failed to update preference');
+      }
+
+      // If we successfully enabled/disabled notifications, sync device registration
+      if (key == 'notifications_enabled') {
+        if (value) {
+          await NotificationService().registerDevice();
+        } else {
+          await NotificationService().unregisterDevice();
+        }
       }
     } catch (e) {
       debugPrint('Error saving preference: $e');
@@ -122,7 +153,7 @@ class _NotificationSettingsScreenState
                       onChanged: _saving
                           ? null
                           : (val) =>
-                              _savePreference('notifications_enabled', val),
+                                _savePreference('notifications_enabled', val),
                       secondary: const Icon(Icons.notifications_active),
                     ),
                     const Divider(),
@@ -149,8 +180,10 @@ class _NotificationSettingsScreenState
                       padding: const EdgeInsets.all(16.0),
                       child: Text(
                         loc.translate('notification_system_note'),
-                        style:
-                            const TextStyle(color: Colors.grey, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
