@@ -21,18 +21,7 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    // 1. Request permissions (especially for iOS)
-    NotificationSettings settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (kDebugMode) {
-      print('User granted permission: ${settings.authorizationStatus}');
-    }
-
-    // 2. Setup local notifications for foreground display
+    // 1. Setup local notifications for foreground display
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -96,6 +85,27 @@ class NotificationService {
     // Auto-register if enrolled
     if (await _storageService.isEnrolled()) {
       registerDevice();
+    }
+  }
+
+  /// Request system permissions for notifications.
+  /// This should be called at a logical point (e.g., after verification) to improve UX.
+  Future<void> requestPermission() async {
+    NotificationSettings settings = await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (kDebugMode) {
+      print(
+        '[Notifications] Permission status: ${settings.authorizationStatus}',
+      );
+    }
+
+    // After permission is granted/denied, ensure device is registered if we have a token
+    if (await _storageService.isEnrolled()) {
+      await registerDevice();
     }
   }
 

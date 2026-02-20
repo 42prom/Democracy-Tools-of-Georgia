@@ -9,6 +9,7 @@ import '../../services/interfaces/i_api_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
 import '../../services/wallet_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/bottom_nav.dart';
 import 'poll_card.dart';
 import '../activity/my_activity_screen.dart';
@@ -54,6 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadUserDemographics();
     _loadPolls();
     _loadMessages();
+    NotificationService().registerDevice();
   }
 
   @override
@@ -125,33 +127,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadPolls() async {
-    debugPrint('[Dashboard] ===== LOADING POLLS =====');
     setState(() => _loading = true);
 
     try {
-      debugPrint('[Dashboard] Calling _apiService.getPolls()...');
       final polls = await _apiService.getPolls();
-      debugPrint(
-        '[Dashboard] ✅ Successfully received ${polls.length} polls from API',
-      );
-
-      if (polls.isNotEmpty) {
-        debugPrint(
-          '[Dashboard] First poll: "${polls[0].title}" (type: ${polls[0].type})',
-        );
-      } else {
-        debugPrint('[Dashboard] ⚠️ No polls returned from API');
-      }
 
       setState(() {
         _polls = polls;
         _loading = false;
       });
-      debugPrint('[Dashboard] State updated with ${_polls.length} polls');
-    } catch (e, stackTrace) {
-      debugPrint('[Dashboard] ===== ERROR LOADING POLLS =====');
-      debugPrint('[Dashboard] Error: $e');
-      debugPrint('[Dashboard] Stack trace: $stackTrace');
+    } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
         final loc = Provider.of<LocalizationService>(context, listen: false);

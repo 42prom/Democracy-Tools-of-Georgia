@@ -86,6 +86,8 @@ mobile/analyzed.txt
 mobile/*_analyze*.txt
 mobile/*_analyze*.log
 mobile/analysis*.log
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist
 
 # Admin build
 admin/dist/

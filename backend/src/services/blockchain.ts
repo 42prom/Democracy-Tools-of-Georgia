@@ -1,6 +1,7 @@
 import { pool } from '../db/client';
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
 import { logger } from '../middleware/logger';
+import { getBlockchainPrivateKey } from '../config/secrets';
 
 /**
  * Normalize an Ethereum address to a safe format.
@@ -126,7 +127,7 @@ export class BlockchainService {
    * Get wallet for signing transactions (requires BLOCKCHAIN_PRIVATE_KEY env var)
    */
   static async getWallet(): Promise<Wallet> {
-    const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
+    const privateKey = getBlockchainPrivateKey();
 
     if (!privateKey) {
       throw new Error('BLOCKCHAIN_PRIVATE_KEY not configured in environment');

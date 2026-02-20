@@ -23,8 +23,9 @@ class PushNotificationService {
   }
 
   private async initialize() {
-    // Import isTest dynamically to avoid circular dependency if possible, or just standard import
-    // But better to use process.env to be safe and simple
+    // Reset disabled state to environment default on initialization
+    this.disabled = getFirebaseConfig().disabled;
+
     if (process.env.NODE_ENV === 'test' || this.disabled) {
       console.log('[PushService] Notifications disabled (Test Mode or Config).');
       this.disabled = true;
@@ -36,7 +37,6 @@ class PushNotificationService {
       const globalSetting = await query("SELECT value FROM settings WHERE key = 'push_enabled_global'");
       if (globalSetting.rows.length > 0 && globalSetting.rows[0].value === 'false') {
         console.log('[PushService] Push notifications disabled via admin settings (push_enabled_global = false).');
-        this.disabled = true;
         return;
       }
 

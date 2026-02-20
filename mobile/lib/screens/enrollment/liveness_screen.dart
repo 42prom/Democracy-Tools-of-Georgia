@@ -14,6 +14,7 @@ import '../../services/liveness/image_format_converter.dart';
 import '../../services/localization_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/storage_service.dart';
+import '../../services/notification_service.dart';
 import '../../config/app_config.dart';
 
 import '../../widgets/liveness/face_contour_overlay.dart';
@@ -197,6 +198,9 @@ class _LivenessScreenState extends State<LivenessScreen>
 
     // Sync activity history from backend
     await _syncHistory(storage);
+
+    // Prompt for notification permissions now that enrollment is complete
+    await NotificationService().requestPermission();
 
     if (!mounted) {
       return;
