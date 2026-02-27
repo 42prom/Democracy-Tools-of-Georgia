@@ -1,0 +1,125 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Secrets and Environment
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+**/*.secret
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Debug output files
+*_output.txt
+*debug*.txt
+*_result.txt
+*_results.txt
+*_error*.txt
+keys.txt
+
+# One-off debug scripts (not part of main codebase)
+backend/query_*.ts
+backend/list_*.ts
+backend/check_*.ts
+backend/trace_*.ts
+backend/verify_*.ts
+backend/test_*.ts
+backend/run_*.ts
+
+# Cache directories
+brain/
+.insightface/
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+.env/
+
+# Mobile build artifacts
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/analyzed.txt
+mobile/*_analyze*.txt
+mobile/*_analyze*.log
+mobile/analysis*.log
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist
+
+# Admin build
+admin/dist/
+
+# Backend build
+backend/dist/
+
+# Development artifacts (prompts, tasks, plans)
+docs/assets/
+flutter-scaffold-skill/
+directives/
+*.md.bak
+prefinal_tasks.md
+restore_docker.md
+final_step.md
+AGENTS_Flutter.md
+
+# Windows artifacts
+nul
+Thumbs.db
+
+# Task output files
+*.output
+
+# Cleanup directive files (after completion)
+FLAGSHIP_AUDIT_REPORT.md
+final_clean_flagship.md
+analyze_stabilization.md
+clean_up.md
+backend/tsc_*.txt
+backend/tsc_*.log
+.coverage
+htmlcov/

@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/localization_service.dart';
+import '../../models/poll.dart';
+import 'confirm_vote_screen.dart';
+import 'survey_screen.dart';
+import 'referendum_screen.dart';
+
+import 'package:intl/intl.dart';
+
+class PollDetailsScreen extends StatefulWidget {
+  final Poll poll;
+
+  const PollDetailsScreen({super.key, required this.poll});
+
+  @override
+  State<PollDetailsScreen> createState() => _PollDetailsScreenState();
+}
+
+class _PollDetailsScreenState extends State<PollDetailsScreen> {
+  String? _selectedOptionId;
+
+  @override
+  void initState() {
+    super.initState();
+    // If this is a survey poll, redirect to SurveyScreen
+    if (widget.poll.isSurvey) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => SurveyScreen(poll: widget.poll),
+          ),
+        );
+      });
+    }
+    // If this is a referendum, redirect to ReferendumScreen
+    if (widget.poll.type == 'referendum') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ReferendumScreen(poll: widget.poll),
+          ),
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = Provider.of<LocalizationService>(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(loc.translate('poll_details'))),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Poll Info (End Date)
+              if (widget.poll.endAt != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${loc.translate('poll_ends')} ${DateFormat.yMMMd().add_Hm().format(DateTime.parse(widget.poll.endAt!).toLocal())}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Main Question (Title)
+              Container(
+                padding: const EdgeInsets.all(24),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).primaryColor.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.how_to_vote,
+                      size: 40,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.poll.title,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
+                            height: 1.3,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Options (Radio Buttons)
+              Expanded(
+                child: ListView.builder(
+                  itemCount: widget.poll.options.length,
+                  itemBuilder: (context, index) {
+                    final option = widget.poll.options[index];
+                    final isSelected = _selectedOptionId == option.id;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _selectedOptionId = option.id);
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.1)
+                                : Colors.grey.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).primaryColor
+                                  : Colors.grey.shade300,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_off,
+                                color: isSelected
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  option.text,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    height: 1.4,
+                                    color: isSelected
+                                        ? Theme.of(context).primaryColor
+                                        : Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge?.color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Review Vote Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _selectedOptionId == null
+                      ? null
+                      : () {
+                          final selectedOption = widget.poll.options.firstWhere(
+                            (opt) => opt.id == _selectedOptionId,
+                          );
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ConfirmVoteScreen(
+                                poll: widget.poll,
+                                selectedOption: selectedOption,
+                              ),
+                            ),
+                          );
+                        },
+                  child: Text(loc.translate('review_vote')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

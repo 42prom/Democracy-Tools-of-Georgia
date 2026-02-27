@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/localization_service.dart';
+import '../../models/poll.dart';
+import '../voting/poll_details_screen.dart';
+import '../voting/survey_screen.dart';
+import '../voting/referendum_screen.dart';
+import 'package:intl/intl.dart';
+
+class PollCard extends StatelessWidget {
+  final Poll poll;
+  final VoidCallback? onVoteComplete;
+
+  const PollCard({super.key, required this.poll, this.onVoteComplete});
+
+  @override
+  Widget build(BuildContext context) {
+    final locService = Provider.of<LocalizationService>(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Type Badge + Title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: poll.type == 'referendum'
+                        ? Colors.purple.withValues(alpha: 0.15)
+                        : poll.isSurvey
+                        ? Colors.blue.withValues(alpha: 0.15)
+                        : Colors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    poll.type.isEmpty
+                        ? ''
+                        : locService.translate(poll.type.toLowerCase()),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: poll.type == 'referendum'
+                          ? Colors.purple
+                          : poll.isSurvey
+                          ? Colors.blue
+                          : Colors.green,
+                    ),
+                  ),
+                ),
+                if (poll.endAt != null) ...[
+                  const Spacer(),
+                  const Icon(Icons.access_time, size: 12, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat.yMMMd().add_Hm().format(
+                      DateTime.parse(poll.endAt!).toLocal(),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              poll.title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                height: 1.25, // Better readability for wrapped titles
+              ),
+            ),
+            if (poll.referendumQuestion != null ||
+                poll.electionQuestion != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                poll.referendumQuestion ?? poll.electionQuestion!,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                  height: 1.3,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 12),
+
+            // Tags
+            Wrap(
+              spacing: 8,
+              children: poll.tags.map((tag) {
+                return Chip(
+                  label: Text(tag, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).primaryColor.withValues(alpha: 0.2),
+                  side: BorderSide.none,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+
+            // Vote Now Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Widget screen;
+                  if (poll.isSurvey) {
+                    screen = SurveyScreen(poll: poll);
+                  } else if (poll.type == 'referendum') {
+                    screen = ReferendumScreen(poll: poll);
+                  } else {
+                    screen = PollDetailsScreen(poll: poll);
+                  }
+                  await Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (context) => screen));
+                  onVoteComplete?.call();
+                },
+                child: Text(
+                  poll.isSurvey
+                      ? locService.translate('take_survey')
+                      : poll.type == 'referendum'
+                      ? locService.translate('vote_on_referendum')
+                      : locService.translate('vote_now'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,234 @@
+
+> dtg-backend@0.1.0 lint
+> eslint src --ext .ts
+
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\config\app.ts
+  2:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\config\jwt.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\config\secrets.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\db\client.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\db\migrate.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\db\redis.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\index.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\auth.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\dynamicRateLimit.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\errorHandler.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\geoBlocking.ts
+  6:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\idempotency.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\logger.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\metrics.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\rateLimit.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\requestId.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\middleware\security.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\activity.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\auth.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\export.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\geoBlocking.ts
+  6:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\insights.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\messages.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\polls.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\profiles.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\regions.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\security.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\settings.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\admin\tickets.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\auth.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\devices.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\enrollment.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\health.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\messages.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\polls.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\profile.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\rewards.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\settings.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\stats.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\tickets.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\routes\wallet.ts
+  5:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\scripts\apply_ledger_manual.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\scripts\check_analytics_service.ts
+  2:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\scripts\fix_k_anonymity.ts
+  2:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\scripts\inspect_votes.ts
+  2:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\analytics.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\auditExport.ts
+  13:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\authRateLimit.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\biometrics.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\blockchain.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\credentials.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\deviceAttestation.ts
+  5:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\geoBlocking.ts
+  6:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\identity.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\ipRateLimit.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\nonce.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\pollMonitor.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\polls.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\pushNotifications.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\rewardProcessor.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\security.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\settingsService.ts
+  2:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\tickets.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\verificationSettings.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\verification\inHouseProviders.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\verification\providerFactory.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\verification\remoteProviders.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\verification\types.ts
+  1:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\voteAnchor.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\voting.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\services\vpnDetection.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\types\credentials.ts
+  4:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\types\polls.ts
+  5:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\types\survey.ts
+  1:1  error  Parsing error: The keyword 'export' is reserved
+
+C:\Users\nakem\OneDrive\Desktop\antygravity\backend\src\utils\httpClient.ts
+  1:1  error  Parsing error: The keyword 'import' is reserved
+
+✖ 75 problems (75 errors, 0 warnings)
+
+(node:12136) ESLintRCWarning: You are using an eslintrc configuration file, which is deprecated and support will be removed in v10.0.0. Please migrate to an eslint.config.js file. See https://eslint.org/docs/latest/use/configure/migration-guide for details. An eslintrc configuration file is used because you have the ESLINT_USE_FLAT_CONFIG environment variable set to false. If you want to use an eslint.config.js file, remove the environment variable. If you want to find the location of the eslintrc configuration file, use the --debug flag.
+(Use `node --trace-warnings ...` to show where the warning was created)

@@ -1,0 +1,201 @@
+name: DTG Integrity & Security CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Daily integrity sweep at 02:00 UTC
+    - cron: "0 2 * * *"
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ────────────────────────────────────────────────
+  # Job 1: Backend Security Audit
+  # ────────────────────────────────────────────────
+  audit-backend:
+    name: Audit Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run security audit (audit-ci)
+        run: npx audit-ci --config .audit-ci.json
+
+  # ────────────────────────────────────────────────
+  # Job 2: Admin Security Audit
+  # ────────────────────────────────────────────────
+  audit-admin:
+    name: Audit Admin
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run npm audit (high severity)
+        run: npm audit --audit-level=high
+
+  # ────────────────────────────────────────────────
+  # Job 3: Cryptographic Unit Tests
+  # ────────────────────────────────────────────────
+  crypto-tests:
+    name: Cryptographic Unit Tests
+    runs-on: ubuntu-latest
+    needs: [audit-backend] # Run tests only if audit passes (basic safety)
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      NODE_ENV: test
+      NULLIFIER_SECRET: ci-test-nullifier-secret-not-for-production
+      CRYPTO_HASHER: hmac
+      RECEIPT_PRIVATE_KEY_PEM: ""
+      RECEIPT_PUBLIC_KEY_PEM: ""
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run crypto-related tests
+        run: npx jest tests/nullifier.test.ts tests/merkle.test.ts tests/receipt.test.ts tests/vote-protocol.test.ts --forceExit
+
+  # ────────────────────────────────────────────────
+  # Job 4: TypeScript Lint & Type-check
+  # ────────────────────────────────────────────────
+  type-check:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+  # ────────────────────────────────────────────────
+  # Job 5: Merkle Integrity Verification
+  # ────────────────────────────────────────────────
+  merkle-integrity:
+    name: Merkle Vote Integrity Sweep
+    runs-on: ubuntu-latest
+    needs: [crypto-tests]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: dtg_user
+          POSTGRES_PASSWORD: dtg_ci_password
+          POSTGRES_DB: dtg_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci
+        run: npm run migrate
+      - name: Run Merkle vote integrity verification
+        env:
+          DATABASE_URL: postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci
+          NULLIFIER_SECRET: ci-integrity-test-secret
+        run: npx tsx src/scripts/verify_vote_integrity.ts
+      - name: Run audit log chain verification
+        env:
+          DATABASE_URL: postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci
+        run: npx tsx src/scripts/verify_audit_log.ts
+
+  # ────────────────────────────────────────────────
+  # Job 6: Flutter Tests
+  # ────────────────────────────────────────────────
+  flutter-tests:
+    name: Flutter Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+      - name: Run Flutter tests
+        working-directory: mobile
+        run: flutter test --reporter compact
+      - name: Flutter analyze
+        working-directory: mobile
+        run: flutter analyze --no-fatal-infos
+
+  # ────────────────────────────────────────────────
+  # Job 7: Shield Service Audit
+  # ────────────────────────────────────────────────
+  audit-shield:
+    name: Audit Shield
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit shield service
+        working-directory: ./dtg-shield-service
+        run: pip-audit -r requirements.txt

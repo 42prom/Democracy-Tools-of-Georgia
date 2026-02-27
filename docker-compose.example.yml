@@ -1,0 +1,51 @@
+version: "3.8"
+
+# DTG Docker Compose Example
+# Use this template for secure production or development deployments.
+# Secrets should be provided via a .env file (see .env.example).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dtg-postgres-prod
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dtg}
+      POSTGRES_USER: ${DB_USER:-dtg_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: dtg-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  backend:
+    image: ${BACKEND_IMAGE:-dtg-backend:latest}
+    container_name: dtg-backend-prod
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:-3000}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - PN_HASH_SECRET=${PN_HASH_SECRET}
+      - API_KEY_ENCRYPTION_SECRET=${API_KEY_ENCRYPTION_SECRET}
+      - DEVICE_HASH_SECRET=${DEVICE_HASH_SECRET}
+      - VOTER_HASH_SECRET=${VOTER_HASH_SECRET}
+      - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:

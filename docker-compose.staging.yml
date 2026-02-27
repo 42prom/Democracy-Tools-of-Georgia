@@ -1,0 +1,61 @@
+version: "3.9"
+
+# DTG Staging Environment
+# Isolated from production — safe to test migrations, config changes, and new features.
+# Usage: docker-compose -f docker-compose.staging.yml up -d
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dtg-postgres-staging
+    environment:
+      POSTGRES_USER: ${DB_USER:-dtg_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-dtg_staging}
+    ports:
+      - "5433:5432" # different port so it doesn't clash with local dev DB
+    volumes:
+      - dtg_staging_postgres:/var/lib/postgresql/data
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtg_user -d dtg_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: dtg-redis-staging
+    ports:
+      - "6380:6379" # different port from dev Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dtg-backend-staging
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://${DB_USER:-dtg_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-dtg_staging}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      NULLIFIER_SECRET: ${NULLIFIER_SECRET}
+      MIN_K_ANONYMITY: "3"
+      PORT: "3001"
+    ports:
+      - "3002:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npm run migrate && npm start"
+    restart: unless-stopped
+
+volumes:
+  dtg_staging_postgres:
+    driver: local

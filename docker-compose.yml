@@ -1,0 +1,121 @@
+version: "3.8"
+
+# =============================================================================
+# DTG Docker Compose - Full Application Stack
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dtg-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dtg}
+      POSTGRES_USER: ${DB_USER:-dtg_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtg_user -d dtg"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: dtg-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  biometric-service:
+    build: ./biometric-service
+    container_name: dtg-biometric-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: always
+
+  backend:
+    build: ./backend
+    container_name: dtg-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://${DB_USER:-dtg_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-dtg}
+      - REDIS_URL=redis://redis:6379/0
+      - BIOMETRIC_SERVICE_URL=http://biometric-service:8000
+      - JWT_SECRET=${JWT_SECRET}
+      - PN_HASH_SECRET=${PN_HASH_SECRET}
+      - API_KEY_ENCRYPTION_SECRET=${API_KEY_ENCRYPTION_SECRET}
+      - DEVICE_HASH_SECRET=${DEVICE_HASH_SECRET}
+      - VOTER_HASH_SECRET=${VOTER_HASH_SECRET}
+      - NULLIFIER_SECRET=${NULLIFIER_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
+      - MIN_K_ANONYMITY=${MIN_K_ANONYMITY:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  dtg-shield-service:
+    build: ./dtg-shield-service
+    container_name: dtg-shield-service
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_URL=http://backend:3000
+      - BLOCK_THRESHOLD=100
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 1s
+      timeout: 5s
+      retries: 3
+      start_period: 1s
+    restart: always
+
+  admin:
+    build: ./admin
+    container_name: dtg-admin
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_PROXY_TARGET=http://dtg-shield-service:8080
+      - VITE_API_BASE_URL=https://api.esme.ge/api/v1
+    depends_on:
+      - dtg-shield-service
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:

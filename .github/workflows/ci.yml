@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-test:
+    name: Backend Build & Test (PR)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://DTG_user:DTG_test_password@localhost:5432/DTG_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test_secret_key_for_ci
+      NODE_ENV: test
+      BIOMETRIC_MOCK_MODE: true
+      NULLIFIER_SECRET: ci-test-nullifier-secret-not-for-production
+      CRYPTO_HASHER: hmac
+      RECEIPT_PRIVATE_KEY_PEM: ""
+      RECEIPT_PUBLIC_KEY_PEM: ""
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: DTG_test
+          POSTGRES_USER: DTG_user
+          POSTGRES_PASSWORD: DTG_test_password
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      - name: Run linter
+        working-directory: ./backend
+        run: npm run lint
+      - name: Run TypeScript check
+        working-directory: ./backend
+        run: npx tsc --noEmit
+      - name: Run migrations
+        working-directory: ./backend
+        run: npm run migrate
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test
+      - name: Build
+        working-directory: ./backend
+        run: npm run build
+
+  contract-validation:
+    name: OpenAPI Contract Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      - name: Validate OpenAPI contracts
+        working-directory: ./backend
+        run: npm run validate:contracts
+
+  admin-build:
+    name: Admin Dashboard Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: admin/package-lock.json
+      - name: Install dependencies
+        working-directory: ./admin
+        run: npm ci
+      - name: Run linter
+        working-directory: ./admin
+        run: npm run lint
+      - name: Run TypeScript check
+        working-directory: ./admin
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: ./admin
+        run: npm run build

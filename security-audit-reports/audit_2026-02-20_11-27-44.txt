@@ -1,0 +1,12 @@
+
+[1;33m▶ Scanning: backend (Node.js / npm)[0m
+  [0;32m✓ No moderate+ vulnerabilities found[0m
+[1;33m▶ Scanning: admin panel (Node.js / npm)[0m
+  [0;31m✗ Vulnerabilities found[0m
+  [1;33m  → Run: cd admin && npm audit fix[0m
+[1;33m▶ Scanning: dtg-shield-service (Python / pip-audit)[0m
+  [1;33m⚠ pip-audit not installed. Install: pip install pip-audit[0m
+[1;33m▶ Scanning: biometric-service (Python / pip-audit)[0m
+  [1;33m⚠ biometric-service/ not found or pip-audit missing — skipping[0m
+[0;34m══════════════════════════════════════════════════[0m
+[0;31m❌ VULNERABILITIES DETECTED — Review the reports above.[0m
