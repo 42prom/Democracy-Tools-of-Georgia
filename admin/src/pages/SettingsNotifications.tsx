@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, Save, AlertCircle, Info, Key, FileText, Send } from 'lucide-react';
+import { settingsApi } from '../api/client';
 
 export default function SettingsNotifications() {
   const [loading, setLoading] = useState(true);
@@ -24,27 +25,19 @@ export default function SettingsNotifications() {
   async function fetchConfig() {
     try {
       setLoading(true);
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const data = await settingsApi.get();
       
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      
-      const data = await response.json();
       if (data.push) {
         setConfig({
           enabledGlobal: data.push.enabledGlobal,
-          enabledPolls: data.push.enabledPolls,
-          enabledMessages: data.push.enabledMessages,
+          enabledPolls: data.push.enabledPolls ?? true,
+          enabledMessages: data.push.enabledMessages ?? true,
           serviceAccountJson: data.push.serviceAccountJson || '',
           serviceAccountPath: data.push.serviceAccountPath || '',
         });
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
@@ -56,24 +49,14 @@ export default function SettingsNotifications() {
       setError(null);
       setSuccess(false);
       
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          push: config
-        })
+      await settingsApi.update({
+        push: config
       });
-      
-      if (!response.ok) throw new Error('Failed to update settings');
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setSaving(false);
     }
@@ -85,28 +68,16 @@ export default function SettingsNotifications() {
       setError(null);
       setTestResult(null);
       
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings/notifications/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          serviceAccountJson: config.serviceAccountJson,
-          serviceAccountPath: config.serviceAccountPath,
-        })
-      });
+      const result = await settingsApi.testNotificationsConnection(
+        config.serviceAccountJson,
+        config.serviceAccountPath
+      );
       
-      const data = await response.json();
-      setTestResult({
-        success: response.ok,
-        message: data.message || data.error || 'Unknown error'
-      });
+      setTestResult(result);
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message
+        message: err.response?.data?.error || err.message
       });
     } finally {
       setTesting(false);

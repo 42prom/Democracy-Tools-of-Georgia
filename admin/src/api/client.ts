@@ -363,14 +363,21 @@ export default apiClient;
 
 // Admin Settings endpoints
 export type AdminSettings = {
-  rewards_enabled_global: boolean;
-  nft_payouts_enabled_global: boolean;
-  chain_id: number;
-  rpc_url: string;
-  nft_contract_address: string;
+  rewards_enabled_global?: boolean;
+  nft_payouts_enabled_global?: boolean;
+  chain_id?: number;
+  rpc_url?: string;
+  nft_contract_address?: string;
   dtg_token_address?: string;
-  reward_token_id: number; // fixed to 1
-  required_confirmations: number;
+  reward_token_id?: number; // fixed to 1
+  required_confirmations?: number;
+  push?: {
+    enabledGlobal: boolean;
+    enabledPolls: boolean;
+    enabledMessages: boolean;
+    serviceAccountJson: string;
+    serviceAccountPath: string;
+  };
 };
 
 export const settingsApi = {
@@ -384,6 +391,10 @@ export const settingsApi = {
   },
   testBlockchainConnection: async (rpcUrl: string): Promise<{ success: boolean; message: string }> => {
     const response = await apiClient.post('/admin/settings/blockchain/test', { rpcUrl });
+    return response.data;
+  },
+  testNotificationsConnection: async (serviceAccountJson: string, serviceAccountPath: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post('/admin/settings/notifications/test', { serviceAccountJson, serviceAccountPath });
     return response.data;
   },
 };

@@ -176,7 +176,12 @@ export async function loadFullConfig(): Promise<any> {
     } else if (key === 'verification_document_provider') {
       config.documentScanner.provider = value;
     } else if (key === 'verification_document_apikey') {
-      config.documentScanner.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      try {
+        config.documentScanner.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      } catch (e) {
+        console.error('[Settings] Failed to decrypt verification_document_apikey. The encryption secret may have changed.');
+        config.documentScanner.apiKey = '[Decryption Failed]';
+      }
     } else if (key === 'verification_document_require_photo_scan') {
       config.documentScanner.requireDocumentPhotoScan = parseBool(value, true);
     } else if (key === 'verification_document_strictness') {
@@ -184,13 +189,23 @@ export async function loadFullConfig(): Promise<any> {
     } else if (key === 'verification_liveness_provider') {
       config.liveness.provider = value;
     } else if (key === 'verification_liveness_apikey') {
-      config.liveness.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      try {
+        config.liveness.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      } catch (e) {
+        console.error('[Settings] Failed to decrypt verification_liveness_apikey.');
+        config.liveness.apiKey = '[Decryption Failed]';
+      }
     } else if (key === 'verification_liveness_retry_limit') {
       config.liveness.retryLimit = parseInt(value, 10);
     } else if (key === 'verification_facematch_provider') {
       config.faceMatch.provider = value;
     } else if (key === 'verification_facematch_apikey') {
-      config.faceMatch.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      try {
+        config.faceMatch.apiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      } catch (e) {
+        console.error('[Settings] Failed to decrypt verification_facematch_apikey.');
+        config.faceMatch.apiKey = '[Decryption Failed]';
+      }
     } else if (key === 'verification_facematch_min_score') {
       config.faceMatch.minScore = parseFloat(value);
     }
@@ -223,7 +238,12 @@ export async function loadFullConfig(): Promise<any> {
     } else if (key === 'security_vpn_detection_provider') {
       config.security.vpnDetectionProvider = value || 'iphub';
     } else if (key === 'security_vpn_detection_apikey') {
-      config.security.vpnDetectionApiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      try {
+        config.security.vpnDetectionApiKey = value ? maskApiKey(decryptApiKey(value)) : '';
+      } catch (e) {
+        console.error('[Settings] Failed to decrypt security_vpn_detection_apikey.');
+        config.security.vpnDetectionApiKey = '[Decryption Failed]';
+      }
     } else if (key === 'security_max_biometric_attempts_per_ip') {
       config.security.maxBiometricAttemptsPerIP = parseInt(value, 10) || 10;
     } else if (key === 'security_biometric_ip_limit_window_minutes') {
@@ -237,7 +257,12 @@ export async function loadFullConfig(): Promise<any> {
     } else if (key === 'push_enabled_messages') {
       config.push.enabledMessages = parseBool(value, true);
     } else if (key === 'push_service_account_json') {
-      config.push.serviceAccountJson = value ? maskApiKey(decryptApiKey(value)) : '';
+      try {
+        config.push.serviceAccountJson = value ? maskApiKey(decryptApiKey(value)) : '';
+      } catch (e) {
+        console.error('[Settings] Failed to decrypt push_service_account_json.');
+        config.push.serviceAccountJson = '[Decryption Failed]';
+      }
     } else if (key === 'push_service_account_path') {
       config.push.serviceAccountPath = value || '';
     }
