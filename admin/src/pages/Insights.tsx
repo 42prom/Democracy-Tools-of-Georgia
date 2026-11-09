@@ -203,10 +203,11 @@ export default function Insights() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="insights-enrollment-from" className="block text-sm font-medium text-gray-700 mb-1">
                 Enrollment Date From
               </label>
               <input
+                id="insights-enrollment-from"
                 type="date"
                 value={minDate}
                 onChange={(e) => setMinDate(e.target.value)}
@@ -215,10 +216,11 @@ export default function Insights() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="insights-enrollment-to" className="block text-sm font-medium text-gray-700 mb-1">
                 Enrollment Date To
               </label>
               <input
+                id="insights-enrollment-to"
                 type="date"
                 value={maxDate}
                 onChange={(e) => setMaxDate(e.target.value)}

@@ -1,5 +1,23 @@
+[CmdletBinding()]
+param(
+    [ValidateRange(0, 65535)]
+    [int]$Port = 0
+)
+
 # Cloudflare Tunnel Startup Script
-# This exposes your local backend to the internet for mobile testing
+# This exposes the local Shield gateway to the internet for mobile testing.
+
+if ($Port -eq 0) {
+    $configuredPort = [Environment]::GetEnvironmentVariable("SHIELD_HOST_PORT")
+    $rootEnv = Join-Path $PSScriptRoot "..\.env"
+    if (-not $configuredPort -and (Test-Path -LiteralPath $rootEnv)) {
+        $portLine = Get-Content -LiteralPath $rootEnv | Where-Object { $_ -match '^SHIELD_HOST_PORT=' } | Select-Object -Last 1
+        if ($portLine) {
+            $configuredPort = ($portLine -split '=', 2)[1].Trim()
+        }
+    }
+    $Port = if ($configuredPort) { [int]$configuredPort } else { 8080 }
+}
 
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Cloudflare Tunnel for DTG Testing" -ForegroundColor Cyan
@@ -19,7 +37,13 @@ if (-not $cloudflared) {
     exit 1
 }
 
-Write-Host "Starting tunnel for backend (port 3000)..." -ForegroundColor Green
+if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -InformationLevel Quiet)) {
+    Write-Host "Nothing is listening on the configured Shield port $Port." -ForegroundColor Red
+    Write-Host "Run .\scripts\docker-preflight.ps1 and start dtg-shield-service first." -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "Starting tunnel for the Shield gateway (port $Port)..." -ForegroundColor Green
 Write-Host ""
 Write-Host "Once started, you'll get a URL like:" -ForegroundColor Yellow
 Write-Host "  https://random-name.trycloudflare.com" -ForegroundColor Cyan
@@ -32,4 +56,4 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Start the tunnel
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url "http://127.0.0.1:$Port"

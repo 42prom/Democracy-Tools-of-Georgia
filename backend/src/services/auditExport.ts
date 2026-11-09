@@ -269,6 +269,33 @@ export class AuditExportService {
     return parseInt(result.rows[0].count, 10);
   }
 
+  private assertPrivacySafeExport(
+    options: AuditExportOptions,
+    poll: PollMetadata,
+    totalVotes: number
+  ): void {
+    if (options.includeVoteLevelData) {
+      throw new Error(
+        'Cannot export vote-level records because choice, timestamp, and demographics can reveal ballot secrecy.'
+      );
+    }
+    if (!options.anonymizeVoters) {
+      throw new Error('Cannot export non-anonymized voter records.');
+    }
+
+    const configuredMinimum = Number.parseInt(process.env.MIN_K_ANONYMITY || '30', 10);
+    const pollMinimum = Number(poll.min_k_anonymity) || 0;
+    const privacyThreshold = Math.max(
+      Number.isInteger(configuredMinimum) ? configuredMinimum : 30,
+      pollMinimum
+    );
+    if (totalVotes < privacyThreshold) {
+      throw new Error(
+        `Cannot export results before the privacy threshold of ${privacyThreshold} votes is met.`
+      );
+    }
+  }
+
   /**
    * Stream vote-level data (memory efficient)
    * Includes cryptographic proof fields: vote_hash (Merkle leaf), chain_hash
@@ -336,14 +363,15 @@ export class AuditExportService {
     // Validate poll
     const poll = await this.validatePoll(options.pollId);
 
-    // Log export action
-    await this.logExport(options, poll);
-
     // Get data
     const pollOptions = await this.getOptions(options.pollId);
     const aggregatedResults = await this.getAggregatedResults(options.pollId);
     const totalVotes = await this.getTotalVotes(options.pollId);
     const participantCount = await this.getParticipantCount(options.pollId);
+    this.assertPrivacySafeExport(options, poll, totalVotes);
+
+    // Fail closed: do not release an export if its audit write fails.
+    await this.logExport(options, poll);
 
     // Build CSV content
     let csvContent = '';
@@ -539,12 +567,13 @@ export class AuditExportService {
    */
   async createExportStream(options: AuditExportOptions): Promise<Readable> {
     const poll = await this.validatePoll(options.pollId);
-    await this.logExport(options, poll);
 
     const self = this;
     const aggregatedResults = await this.getAggregatedResults(options.pollId);
     const totalVotes = await this.getTotalVotes(options.pollId);
     const participantCount = await this.getParticipantCount(options.pollId);
+    this.assertPrivacySafeExport(options, poll, totalVotes);
+    await this.logExport(options, poll);
 
     let headersSent = false;
     let voteIterator: AsyncGenerator<any, void, unknown> | null = null;

@@ -71,12 +71,13 @@ export default function DateTimePicker24h({ label, value, onChange }: DateTimePi
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <span className="block text-sm font-medium text-gray-700 mb-1.5">
           {label}
-        </label>
+        </span>
       )}
       <div className="flex items-center gap-2">
         <input
+          aria-label={label ? `${label} date` : 'Date'}
           type="date"
           value={localDate}
           onChange={(e) => handleDateChange(e.target.value)}
@@ -84,6 +85,7 @@ export default function DateTimePicker24h({ label, value, onChange }: DateTimePi
         />
         <div className="flex items-center gap-1">
           <input
+            aria-label={label ? `${label} hour` : 'Hour'}
             type="text"
             inputMode="numeric"
             value={localHours}
@@ -102,6 +104,7 @@ export default function DateTimePicker24h({ label, value, onChange }: DateTimePi
           />
           <span className="text-gray-500 font-bold">:</span>
           <input
+            aria-label={label ? `${label} minute` : 'Minute'}
             type="text"
             inputMode="numeric"
             value={localMinutes}

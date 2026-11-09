@@ -15,11 +15,11 @@ declare global {
 /**
  * Configure Pino Logger
  * - Production: JSON format (fast, machine-readable)
- * - Development: Pretty print (human-readable)
+ * - Optional local pretty-printing when LOG_PRETTY=true and pino-pretty is installed
  */
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  transport: process.env.NODE_ENV !== 'production' 
+  transport: process.env.LOG_PRETTY === 'true'
     ? { 
         target: 'pino-pretty',
         options: {

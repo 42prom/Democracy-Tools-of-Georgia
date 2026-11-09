@@ -1,61 +1,126 @@
-version: "3.9"
-
 # DTG Staging Environment
 # Isolated from production — safe to test migrations, config changes, and new features.
 # Usage: docker-compose -f docker-compose.staging.yml up -d
 
+name: ${DTG_STAGING_PROJECT_NAME:-dtg-voting-staging}
+
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: dtg-postgres-staging
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
     environment:
-      POSTGRES_USER: ${DB_USER:-dtg_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_OWNER_USER:?DB_OWNER_USER is required}
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
       POSTGRES_DB: ${DB_NAME:-dtg_staging}
+      DB_APP_USER: ${DB_APP_USER:?DB_APP_USER is required}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
     ports:
-      - "5433:5432" # different port so it doesn't clash with local dev DB
+      - "127.0.0.1:${STAGING_POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - dtg_staging_postgres:/var/lib/postgresql/data
       - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dtg_user -d dtg_staging"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_OWNER_USER:?DB_OWNER_USER is required} -d ${DB_NAME:-dtg_staging}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
-    image: redis:7-alpine
-    container_name: dtg-redis-staging
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     ports:
-      - "6380:6379" # different port from dev Redis
+      - "127.0.0.1:${STAGING_REDIS_HOST_PORT:-16379}:6379"
+    volumes:
+      - dtg_staging_redis:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: dtg-voting-backend:staging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_OWNER_USER:?DB_OWNER_USER is required}:${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}@postgres:5432/${DB_NAME:-dtg_staging}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["node", "dist/src/db/migrate.js"]
+    restart: "no"
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: dtg-backend-staging
+    image: dtg-voting-backend:staging
     environment:
-      NODE_ENV: staging
-      DATABASE_URL: postgresql://${DB_USER:-dtg_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-dtg_staging}
+      NODE_ENV: production
+      DEPLOYMENT_ENV: staging
+      DATABASE_URL: postgresql://${DB_APP_USER:?DB_APP_USER is required}:${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}@postgres:5432/${DB_NAME:-dtg_staging}
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      NULLIFIER_SECRET: ${NULLIFIER_SECRET}
-      MIN_K_ANONYMITY: "3"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      PN_HASH_SECRET: ${PN_HASH_SECRET:?PN_HASH_SECRET is required}
+      API_KEY_ENCRYPTION_SECRET: ${API_KEY_ENCRYPTION_SECRET:?API_KEY_ENCRYPTION_SECRET is required}
+      DEVICE_HASH_SECRET: ${DEVICE_HASH_SECRET:?DEVICE_HASH_SECRET is required}
+      VOTER_HASH_SECRET: ${VOTER_HASH_SECRET:?VOTER_HASH_SECRET is required}
+      NULLIFIER_SECRET: ${NULLIFIER_SECRET:?NULLIFIER_SECRET is required}
+      RECEIPT_PRIVATE_KEY_PEM: ${RECEIPT_PRIVATE_KEY_PEM:?RECEIPT_PRIVATE_KEY_PEM is required}
+      RECEIPT_PUBLIC_KEY_PEM: ${RECEIPT_PUBLIC_KEY_PEM:?RECEIPT_PUBLIC_KEY_PEM is required}
+      REQUIRE_DEVICE_ATTESTATION: "true"
+      ALLOW_DEVELOPMENT_ATTESTATION_BYPASS: "false"
+      ANDROID_PACKAGE_NAME: ${ANDROID_PACKAGE_NAME:-messaging.dtg}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      APPLE_DEVICECHECK_KEY_ID: ${APPLE_DEVICECHECK_KEY_ID:?APPLE_DEVICECHECK_KEY_ID is required}
+      APPLE_DEVICECHECK_TEAM_ID: ${APPLE_DEVICECHECK_TEAM_ID:?APPLE_DEVICECHECK_TEAM_ID is required}
+      APPLE_DEVICECHECK_PRIVATE_KEY: ${APPLE_DEVICECHECK_PRIVATE_KEY:?APPLE_DEVICECHECK_PRIVATE_KEY is required}
+      APPLE_APP_ID_PREFIX: ${APPLE_APP_ID_PREFIX:?APPLE_APP_ID_PREFIX is required}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-ge.dtfg.mobile}
+      APPLE_APP_ATTEST_ENVIRONMENT: ${APPLE_APP_ATTEST_ENVIRONMENT:-development}
+      APPLE_APP_ATTEST_REQUIRE_EXTENSIONS: "true"
+      APPLE_APP_ATTEST_ALLOWED_CATEGORIES: ${APPLE_APP_ATTEST_ALLOWED_CATEGORIES:-2,3,4}
+      APPLE_APP_BUNDLE_VERSION: ${APPLE_APP_BUNDLE_VERSION:?APPLE_APP_BUNDLE_VERSION is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      ADMIN_MFA_REQUIRED: "true"
+      ADMIN_SESSION_IDLE_SECONDS: ${ADMIN_SESSION_IDLE_SECONDS:-900}
+      ADMIN_SESSION_ABSOLUTE_SECONDS: ${ADMIN_SESSION_ABSOLUTE_SECONDS:-28800}
+      ADMIN_MAX_CONCURRENT_SESSIONS: ${ADMIN_MAX_CONCURRENT_SESSIONS:-3}
+      ENFORCE_RESTRICTED_DB_ROLE: "true"
+      METRICS_BEARER_TOKEN: ${METRICS_BEARER_TOKEN:?METRICS_BEARER_TOKEN is required}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      MIN_K_ANONYMITY: "30"
+      REWARD_PROCESSOR_ENABLED: ${REWARD_PROCESSOR_ENABLED:-false}
+      POLL_STATUS_MONITOR_ENABLED: ${POLL_STATUS_MONITOR_ENABLED:-false}
+      VOTE_ANCHOR_ENABLED: ${VOTE_ANCHOR_ENABLED:-false}
+      AUDIT_CHECKPOINT_ENABLED: ${AUDIT_CHECKPOINT_ENABLED:-false}
+      AUDIT_CHECKPOINT_URL: ${AUDIT_CHECKPOINT_URL:-}
+      AUDIT_CHECKPOINT_ALLOWED_HOSTS: ${AUDIT_CHECKPOINT_ALLOWED_HOSTS:-}
+      AUDIT_CHECKPOINT_DEPLOYMENT_ID: ${AUDIT_CHECKPOINT_DEPLOYMENT_ID:-dtg-staging}
+      AUDIT_CHECKPOINT_INTERVAL_SECONDS: ${AUDIT_CHECKPOINT_INTERVAL_SECONDS:-300}
+      AUDIT_CHECKPOINT_PRIVATE_KEY_PEM: ${AUDIT_CHECKPOINT_PRIVATE_KEY_PEM:-}
+      AUDIT_CHECKPOINT_PUBLIC_KEY_PEM: ${AUDIT_CHECKPOINT_PUBLIC_KEY_PEM:-}
+      AUDIT_CHECKPOINT_BEARER_TOKEN: ${AUDIT_CHECKPOINT_BEARER_TOKEN:-}
+      BLOCKCHAIN_RPC_ALLOWED_HOSTS: ${BLOCKCHAIN_RPC_ALLOWED_HOSTS:-}
+      ALLOW_MOCK_LOGIN: "false"
+      BYPASS_ADMIN_AUTH: "false"
+      ENABLE_DEBUG_LOGGING: "false"
       PORT: "3001"
     ports:
-      - "3002:3001"
+      - "127.0.0.1:${STAGING_BACKEND_HOST_PORT:-13001}:3001"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
-    command: sh -c "npm run migrate && npm start"
+    command: ["node", "dist/src/index.js"]
     restart: unless-stopped
 
 volumes:
   dtg_staging_postgres:
+    driver: local
+  dtg_staging_redis:
     driver: local

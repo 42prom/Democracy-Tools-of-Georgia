@@ -4,7 +4,6 @@ import { connectRedis, closeRedis } from '../src/db/redis';
 import NonceService from '../src/services/nonce';
 import { submitVote } from '../src/services/voting';
 import crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
 
 async function runSimulation() {
   console.log('🔒 Starting Unlinkable Ballot Secrecy Simulation...');
@@ -15,7 +14,7 @@ async function runSimulation() {
 
     // 1. Create a Test Poll
     console.log('1. Creating Test Poll...');
-    const pollId = uuidv4();
+    const pollId = crypto.randomUUID();
     await query(
       `INSERT INTO polls (id, title, description, type, status, start_at, end_at, audience_rules, min_k_anonymity, published_at)
        VALUES ($1, $2, $3, $4, $5, NOW(), NOW() + INTERVAL '1 day', $6, $7, NOW())`,
@@ -23,8 +22,8 @@ async function runSimulation() {
     );
     
     // Add options
-    const optionIdA = uuidv4();
-    const optionIdB = uuidv4();
+    const optionIdA = crypto.randomUUID();
+    const optionIdB = crypto.randomUUID();
     await query('INSERT INTO poll_options (id, poll_id, text, display_order) VALUES ($1, $2, $3, $4)', [optionIdA, pollId, 'Option A', 0]);
     await query('INSERT INTO poll_options (id, poll_id, text, display_order) VALUES ($1, $2, $3, $4)', [optionIdB, pollId, 'Option B', 1]);
 
@@ -58,6 +57,7 @@ async function runSimulation() {
             optionId: selectedOption,
             nullifier: nullifier,
             nonce: nonce,
+            timestampBucket: Math.floor(Date.now() / 60_000),
             signature: 'mock_signature',
             attestation: { token: 'mock_attestation_token' } // Mocking attestation check bypass or valid
         };

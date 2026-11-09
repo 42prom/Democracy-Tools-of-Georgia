@@ -6,6 +6,7 @@ import {
   verify,
   KeyObject,
 } from 'crypto';
+import { getSecret } from '../config/vault';
 
 /**
  * Receipt Signer Service
@@ -46,26 +47,62 @@ export interface SignedReceipt {
   version: 1;
 }
 
+function normalizePem(value: string): string {
+  return value.includes('\\n') ? value.replace(/\\n/g, '\n') : value;
+}
+
 /** Load and validate the private key from environment. */
-function getPrivateKey(): KeyObject {
-  const pem = process.env.RECEIPT_PRIVATE_KEY_PEM;
+function parsePrivateKey(pem: string | undefined): KeyObject {
   if (!pem) {
     throw new Error(
       '[ReceiptSigner] RECEIPT_PRIVATE_KEY_PEM environment variable is required.'
     );
   }
-  return createPrivateKey(pem);
+  const key = createPrivateKey(normalizePem(pem));
+  if (key.asymmetricKeyType !== 'ed25519') {
+    throw new Error('[ReceiptSigner] RECEIPT_PRIVATE_KEY_PEM must be an Ed25519 key.');
+  }
+  return key;
+}
+
+function getPrivateKey(): KeyObject {
+  return parsePrivateKey(getSecret('RECEIPT_PRIVATE_KEY_PEM'));
 }
 
 /** Load and validate the public key from environment. */
-function getPublicKey(): KeyObject {
-  const pem = process.env.RECEIPT_PUBLIC_KEY_PEM;
+function parsePublicKey(pem: string | undefined): KeyObject {
   if (!pem) {
     throw new Error(
       '[ReceiptSigner] RECEIPT_PUBLIC_KEY_PEM environment variable is required.'
     );
   }
-  return createPublicKey(pem);
+  const key = createPublicKey(normalizePem(pem));
+  if (key.asymmetricKeyType !== 'ed25519') {
+    throw new Error('[ReceiptSigner] RECEIPT_PUBLIC_KEY_PEM must be an Ed25519 key.');
+  }
+  return key;
+}
+
+function getPublicKey(): KeyObject {
+  return parsePublicKey(getSecret('RECEIPT_PUBLIC_KEY_PEM'));
+}
+
+/**
+ * Fail-fast validation used during server startup. It also proves that the
+ * configured private and public keys form the same Ed25519 key pair.
+ */
+export function assertReceiptSigningConfigured(
+  privateKeyPem: string | undefined = getSecret('RECEIPT_PRIVATE_KEY_PEM'),
+  publicKeyPem: string | undefined = getSecret('RECEIPT_PUBLIC_KEY_PEM')
+): void {
+  const privateKey = parsePrivateKey(privateKeyPem);
+  const publicKey = parsePublicKey(publicKeyPem);
+  const probe = Buffer.from('dtg-receipt-key-self-test-v1', 'utf8');
+  const signature = sign(null, probe, privateKey);
+
+  if (!verify(null, probe, publicKey, signature)) {
+    throw new Error('[ReceiptSigner] Configured receipt keys do not form a matching key pair.');
+  }
 }
 
 /**
@@ -110,13 +147,13 @@ export function verifyReceipt(receipt: SignedReceipt): boolean {
  * Get public key in PEM format for publication at the well-known endpoint.
  */
 export function getPublicKeyPem(): string {
-  const pem = process.env.RECEIPT_PUBLIC_KEY_PEM;
+  const pem = getSecret('RECEIPT_PUBLIC_KEY_PEM');
   if (!pem) {
     throw new Error(
       '[ReceiptSigner] RECEIPT_PUBLIC_KEY_PEM environment variable is required.'
     );
   }
-  return pem;
+  return normalizePem(pem);
 }
 
 /**

@@ -32,6 +32,7 @@ export default function Modal({
   maxWidth = 'md',
   footer,
 }: ModalProps) {
+  const titleId = React.useId();
   // Prevent scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +58,9 @@ export default function Modal({
       {/* Modal Container */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
           className={clsx(
             'relative bg-white rounded-xl shadow-xl w-full flex flex-col animate-in zoom-in-95 fade-in duration-200',
             maxWidthClasses[maxWidth]
@@ -70,9 +74,11 @@ export default function Modal({
                   {icon}
                 </div>
               )}
-              <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+              <h2 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h2>
             </div>
             <button
+              type="button"
+              aria-label="Close dialog"
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >

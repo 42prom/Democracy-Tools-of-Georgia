@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Save, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { adminFetch } from '../api/client';
 
 interface RateLimitConfig {
   ip?: number;
@@ -147,12 +148,7 @@ export default function SettingsSecurity() {
   async function fetchConfig() {
     try {
       setLoading(true);
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await adminFetch('/api/v1/admin/settings');
       
       if (!response.ok) throw new Error('Failed to fetch settings');
       
@@ -205,12 +201,10 @@ export default function SettingsSecurity() {
       setError(null);
       setSuccess(false);
 
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings', {
+      const response = await adminFetch('/api/v1/admin/settings', {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           // The backend patch handler iterates and saves key/value. 
@@ -256,12 +250,10 @@ export default function SettingsSecurity() {
     setVpnTestStatus({ status: 'testing', message: 'Testing connection...' });
 
     try {
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/settings/vpn-detection/test', {
+      const response = await adminFetch('/api/v1/admin/settings/vpn-detection/test', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           provider: config.vpnDetectionProvider,

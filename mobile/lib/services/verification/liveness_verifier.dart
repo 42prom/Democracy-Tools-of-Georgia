@@ -23,7 +23,8 @@ abstract class LivenessVerifier {
 /// Capabilities supported by a liveness verifier
 class LivenessVerifierCapabilities {
   final bool supportsPassiveLiveness; // Passive detection without user action
-  final bool supportsActiveLiveness; // Requires user challenges (blink, smile, etc)
+  final bool
+  supportsActiveLiveness; // Requires user challenges (blink, smile, etc)
   final bool requiresCamera;
   final List<String> supportedChallenges;
 
@@ -68,7 +69,9 @@ class MockLivenessVerifier implements LivenessVerifier {
       passed: passed,
       score: score,
       challenge: input.challengeType,
-      errorMessage: passed ? null : 'Liveness verification failed - please try again',
+      errorMessage: passed
+          ? null
+          : 'Liveness verification failed - please try again',
     );
   }
 
@@ -149,7 +152,8 @@ class MLLivenessVerifier implements LivenessVerifier {
   Future<LivenessResult> verifyLiveness(LivenessInput input) async {
     throw VerificationException(
       type: VerificationErrorType.unknownError,
-      message: 'ML liveness verification not yet implemented - use MockLivenessVerifier for MVP',
+      message:
+          'ML liveness verification not yet implemented - use MockLivenessVerifier for MVP',
     );
   }
 

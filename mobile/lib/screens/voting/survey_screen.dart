@@ -5,6 +5,7 @@ import '../../models/poll.dart';
 import '../../services/interfaces/i_api_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/service_locator.dart';
+import '../../services/device_attestation_service.dart';
 import '../../services/storage_service.dart';
 import 'vote_receipt_screen.dart';
 
@@ -830,37 +831,35 @@ class _SurveyScreenState extends State<SurveyScreen> {
       );
       final challengeResponse = await apiService.requestChallenge();
       final String nonce = challengeResponse['nonce'];
-      // Step 2: Issue attestation
+      // Step 2: Canonicalize every answer before requesting device proof.
       setState(
-        () => _statusMessage = locService.translate('step_2_4_attestation'),
+        () =>
+            _statusMessage = locService.translate('step_2_4_response_binding'),
+      );
+      final responsesList = _responses.values.map((r) => r.toJson()).toList();
+      final surveyAttestationOption =
+          DeviceAttestationService.buildSurveyAttestationOption(responsesList);
+
+      // Step 3: Issue hardware attestation bound to the canonical response digest.
+      setState(
+        () => _statusMessage = locService.translate('step_3_4_attestation'),
       );
       final timestampBucket = DateTime.now().millisecondsSinceEpoch ~/ 60000;
 
       final attestationResponse = await apiService.issueAttestation(
         pollId: widget.poll.id,
-        optionId: 'survey', // Survey uses different submission
+        optionId: surveyAttestationOption,
         timestampBucket: timestampBucket,
         nonce: nonce,
       );
       final String attestation = attestationResponse['attestation'];
 
-      // Step 3: Compute nullifier
-      setState(
-        () => _statusMessage = locService.translate('step_3_4_nullifier'),
-      );
-      final String nullifier = await storageService.computeNullifier(
-        widget.poll.id,
-      );
-
       // Step 4: Submit survey responses
       setState(
         () => _statusMessage = locService.translate('step_4_4_submitting'),
       );
-      final responsesList = _responses.values.map((r) => r.toJson()).toList();
-
       final result = await apiService.submitSurvey(
         pollId: widget.poll.id,
-        nullifier: nullifier,
         attestation: attestation,
         timestampBucket: timestampBucket,
         responses: responsesList,

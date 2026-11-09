@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     
     # Redis Integration
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+    # Comma-separated proxy CIDRs whose forwarding headers may be trusted.
+    # Empty by default: direct clients cannot spoof their source address.
+    TRUSTED_PROXY_CIDRS: str = os.getenv("TRUSTED_PROXY_CIDRS", "")
     
     # AI/Heuristic Settings
     BASE_LATENCY_THRESHOLD_MS: int = 500

@@ -16,8 +16,9 @@ class SecureStorageService {
 
   // Keys
   static const _credentialKey = 'credential';
-  static const _credentialSecretKey = 'credential_secret';
+  static const _legacyCredentialSecretKey = 'credential_secret';
   static const _userIdKey = 'user_id';
+  static const _installationIdKey = 'installation_id';
 
   // --- Credential (session JWT / attestation token) ---
 
@@ -33,18 +34,9 @@ class SecureStorageService {
     await _storage.delete(key: _credentialKey);
   }
 
-  // --- Credential Secret (used for nullifier computation, never leaves device) ---
-
-  Future<String?> getCredentialSecret() async {
-    return await _storage.read(key: _credentialSecretKey);
-  }
-
-  Future<void> saveCredentialSecret(String secret) async {
-    await _storage.write(key: _credentialSecretKey, value: secret);
-  }
-
-  Future<void> deleteCredentialSecret() async {
-    await _storage.delete(key: _credentialSecretKey);
+  /// Removes the obsolete client-nullifier secret from upgraded installs.
+  Future<void> deleteLegacyCredentialSecret() async {
+    await _storage.delete(key: _legacyCredentialSecretKey);
   }
 
   // --- User ID ---
@@ -59,6 +51,16 @@ class SecureStorageService {
 
   Future<void> deleteUserId() async {
     await _storage.delete(key: _userIdKey);
+  }
+
+  // --- Random installation ID (never derived from PII or wallet data) ---
+
+  Future<String?> getInstallationId() async {
+    return await _storage.read(key: _installationIdKey);
+  }
+
+  Future<void> saveInstallationId(String installationId) async {
+    await _storage.write(key: _installationIdKey, value: installationId);
   }
 
   // --- Bulk operations ---

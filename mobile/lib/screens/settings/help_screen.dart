@@ -71,10 +71,9 @@ class HelpScreen extends StatelessWidget {
                 // Quick Actions
                 Text(
                   loc.translate('quick_actions'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -117,10 +116,9 @@ class HelpScreen extends StatelessWidget {
                 // FAQ Section
                 Text(
                   loc.translate('faq'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -170,8 +168,9 @@ class HelpScreen extends StatelessWidget {
                           children: [
                             Text(
                               loc.translate('email_support'),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(

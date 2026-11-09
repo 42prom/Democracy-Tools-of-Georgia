@@ -17,6 +17,8 @@ coverage/
 *.dart.js.map
 *.dill
 *.lock
+# Application dependency versions must be reproducible in CI.
+!pubspec.lock
 
 ###############################################################################
 # Android (Gradle / Android Studio)

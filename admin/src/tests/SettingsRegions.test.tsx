@@ -182,7 +182,7 @@ describe('SettingsRegions Component', () => {
       expect(screen.getByText('Kutaisi')).toBeInTheDocument();
 
       // Click clear button
-      const clearButton = screen.getByRole('button', { name: '' }); // X icon button
+      const clearButton = screen.getByRole('button', { name: 'Clear region search' });
       fireEvent.click(clearButton);
 
       // All regions should be visible again
@@ -219,7 +219,7 @@ describe('SettingsRegions Component', () => {
       fireEvent.click(addButton);
 
       // Modal should be visible
-      expect(screen.getByText('Add Region')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Add Region' })).toBeInTheDocument();
       expect(screen.getByLabelText(/region code/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/name \(english\)/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/name \(georgian\)/i)).toBeInTheDocument();
@@ -305,11 +305,7 @@ describe('SettingsRegions Component', () => {
       });
 
       // Click edit button (first edit icon)
-      const editButtons = screen.getAllByRole('button', { name: '' });
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg')?.classList.contains('lucide-edit')
-      );
-      fireEvent.click(editButton!);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Tbilisi' }));
 
       // Modal should show with prefilled data
       await waitFor(() => {
@@ -336,11 +332,7 @@ describe('SettingsRegions Component', () => {
       });
 
       // Click edit
-      const editButtons = screen.getAllByRole('button', { name: '' });
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg')?.classList.contains('lucide-edit')
-      );
-      fireEvent.click(editButton!);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Tbilisi' }));
 
       // Update name
       await waitFor(() => {
@@ -377,11 +369,7 @@ describe('SettingsRegions Component', () => {
       });
 
       // Click delete button
-      const deleteButtons = screen.getAllByRole('button', { name: '' });
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg')?.classList.contains('lucide-trash-2')
-      );
-      fireEvent.click(deleteButton!);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Tbilisi' }));
 
       await waitFor(() => {
         expect(global.confirm).toHaveBeenCalledWith(
@@ -401,11 +389,7 @@ describe('SettingsRegions Component', () => {
         expect(screen.getByText('Tbilisi')).toBeInTheDocument();
       });
 
-      const deleteButtons = screen.getAllByRole('button', { name: '' });
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg')?.classList.contains('lucide-trash-2')
-      );
-      fireEvent.click(deleteButton!);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Tbilisi' }));
 
       expect(regionsApi.delete).not.toHaveBeenCalled();
     });

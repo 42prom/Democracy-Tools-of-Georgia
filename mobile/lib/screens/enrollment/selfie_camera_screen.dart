@@ -434,7 +434,9 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen>
                               ),
                             ),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 40,
+                              ),
                               child: Text(
                                 loc.translate(_instructionKey),
                                 textAlign: TextAlign.center,

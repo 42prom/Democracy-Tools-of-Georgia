@@ -377,6 +377,7 @@ CREATE TABLE IF NOT EXISTS public.settings (
 CREATE TABLE IF NOT EXISTS public.survey_nullifiers (
     poll_id uuid NOT NULL REFERENCES public.polls(id) ON DELETE CASCADE,
     nullifier_hash character(64) NOT NULL,
+    submission_id uuid DEFAULT gen_random_uuid() NOT NULL UNIQUE,
     created_at timestamp with time zone DEFAULT now(),
     PRIMARY KEY (poll_id, nullifier_hash)
 );

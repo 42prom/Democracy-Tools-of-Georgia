@@ -1,34 +1,41 @@
-version: "3.8"
-
 # =============================================================================
 # DTG Docker Compose - Full Application Stack
 # =============================================================================
 
+name: ${DTG_LOCAL_PROJECT_NAME:-antygravity}
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: dtg-postgres
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
     environment:
       POSTGRES_DB: ${DB_NAME:-dtg}
       POSTGRES_USER: ${DB_USER:-dtg_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dtg_user -d dtg"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dtg_user} -d ${DB_NAME:-dtg}"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    restart: always
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 1m
+    logging: *default-logging
 
   redis:
-    image: redis:7-alpine
-    container_name: dtg-redis
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -36,86 +43,148 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    restart: always
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
 
   biometric-service:
     build: ./biometric-service
-    container_name: dtg-biometric-service
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${BIOMETRIC_HOST_PORT:-8001}:8000"
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      - biometric_models:/home/dtg/.insightface/models
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
-    restart: always
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    logging: *default-logging
 
   backend:
     build: ./backend
-    container_name: dtg-backend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3001}:3000"
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - DATABASE_URL=postgresql://${DB_USER:-dtg_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-dtg}
+      - DATABASE_URL=postgresql://${DB_USER:-dtg_user}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:-dtg}
       - REDIS_URL=redis://redis:6379/0
       - BIOMETRIC_SERVICE_URL=http://biometric-service:8000
-      - JWT_SECRET=${JWT_SECRET}
-      - PN_HASH_SECRET=${PN_HASH_SECRET}
-      - API_KEY_ENCRYPTION_SECRET=${API_KEY_ENCRYPTION_SECRET}
-      - DEVICE_HASH_SECRET=${DEVICE_HASH_SECRET}
-      - VOTER_HASH_SECRET=${VOTER_HASH_SECRET}
-      - NULLIFIER_SECRET=${NULLIFIER_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - PN_HASH_SECRET=${PN_HASH_SECRET:?PN_HASH_SECRET is required}
+      - API_KEY_ENCRYPTION_SECRET=${API_KEY_ENCRYPTION_SECRET:?API_KEY_ENCRYPTION_SECRET is required}
+      - DEVICE_HASH_SECRET=${DEVICE_HASH_SECRET:?DEVICE_HASH_SECRET is required}
+      - VOTER_HASH_SECRET=${VOTER_HASH_SECRET:?VOTER_HASH_SECRET is required}
+      - NULLIFIER_SECRET=${NULLIFIER_SECRET:?NULLIFIER_SECRET is required}
+      - LOG_PRETTY=false
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - ADMIN_MFA_REQUIRED=${ADMIN_MFA_REQUIRED:-false}
+      - ADMIN_SESSION_IDLE_SECONDS=${ADMIN_SESSION_IDLE_SECONDS:-900}
+      - ADMIN_SESSION_ABSOLUTE_SECONDS=${ADMIN_SESSION_ABSOLUTE_SECONDS:-28800}
+      - ADMIN_MAX_CONCURRENT_SESSIONS=${ADMIN_MAX_CONCURRENT_SESSIONS:-3}
       - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
-      - MIN_K_ANONYMITY=${MIN_K_ANONYMITY:-1}
+      - BLOCKCHAIN_RPC_ALLOWED_HOSTS=${BLOCKCHAIN_RPC_ALLOWED_HOSTS:-}
+      - MIN_K_ANONYMITY=${MIN_K_ANONYMITY:-3}
+      - REWARD_PROCESSOR_ENABLED=${REWARD_PROCESSOR_ENABLED:-false}
+      - POLL_STATUS_MONITOR_ENABLED=${POLL_STATUS_MONITOR_ENABLED:-false}
+      - VOTE_ANCHOR_ENABLED=${VOTE_ANCHOR_ENABLED:-false}
     depends_on:
+      biometric-service:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: always
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    logging: *default-logging
 
   dtg-shield-service:
     build: ./dtg-shield-service
-    container_name: dtg-shield-service
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${SHIELD_HOST_PORT:-8080}:8080"
     environment:
       - PYTHONUNBUFFERED=1
       - REDIS_URL=redis://redis:6379/0
       - BACKEND_URL=http://backend:3000
       - BLOCK_THRESHOLD=100
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 1s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
+      interval: 5s
       timeout: 5s
-      retries: 3
-      start_period: 1s
-    restart: always
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    logging: *default-logging
 
   admin:
-    build: ./admin
-    container_name: dtg-admin
+    build:
+      context: ./admin
+      args:
+        VITE_API_BASE_URL: /api/v1
     ports:
-      - "5173:5173"
-    environment:
-      - VITE_PROXY_TARGET=http://dtg-shield-service:8080
-      - VITE_API_BASE_URL=https://api.esme.ge/api/v1
+      - "127.0.0.1:${ADMIN_HOST_PORT:-5173}:8080"
     depends_on:
       - dtg-shield-service
-    restart: always
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
 
 volumes:
   postgres_data:
   redis_data:
+  biometric_models:

@@ -2,6 +2,7 @@ import { pool } from '../db/client';
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
 import { logger } from '../middleware/logger';
 import { getBlockchainPrivateKey } from '../config/secrets';
+import { assertSafeBlockchainRpcUrl } from './outboundUrl';
 
 /**
  * Normalize an Ethereum address to a safe format.
@@ -111,6 +112,8 @@ export class BlockchainService {
       throw new Error('Blockchain RPC URL not configured');
     }
 
+    rpcUrl = await assertSafeBlockchainRpcUrl(rpcUrl);
+
     try {
       // Create new provider (or reuse if same URL)
       if (!this.provider || this.provider._getConnection().url !== rpcUrl) {
@@ -149,12 +152,7 @@ export class BlockchainService {
     const startTime = Date.now();
 
     try {
-      if (!rpcUrl || !rpcUrl.startsWith('http')) {
-        return {
-          success: false,
-          message: 'Invalid RPC URL format. Must start with http:// or https://',
-        };
-      }
+      rpcUrl = await assertSafeBlockchainRpcUrl(rpcUrl);
 
       const provider = new JsonRpcProvider(rpcUrl);
 

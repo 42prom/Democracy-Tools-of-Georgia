@@ -20,6 +20,20 @@ export interface QueryResult<T = any> {
   rowCount: number | null;
 }
 
+function databaseErrorMetadata(error: unknown): Record<string, unknown> {
+  if (!error || typeof error !== 'object') {
+    return { message: 'Unknown database error' };
+  }
+  const dbError = error as Record<string, unknown>;
+  return {
+    message: typeof dbError.message === 'string' ? dbError.message : 'Database operation failed',
+    code: dbError.code,
+    constraint: dbError.constraint,
+    table: dbError.table,
+    severity: dbError.severity,
+  };
+}
+
 /**
  * Execute a query with the connection pool
  */
@@ -38,7 +52,9 @@ export async function query<T = any>(
 
     return res;
   } catch (error) {
-    console.error('Database query error', { text, error });
+    // Never log PostgreSQL `detail`: uniqueness errors can include nullifiers,
+    // identifiers, or other values from bound parameters.
+    console.error('Database query error', { text, error: databaseErrorMetadata(error) });
     throw error;
   }
 }
@@ -66,7 +82,12 @@ export async function transaction<T>(
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Database transaction error:', error);
+    const operational = Boolean(
+      error && typeof error === 'object' && (error as Record<string, unknown>).isOperational
+    );
+    if (!operational) {
+      console.error('Database transaction error:', databaseErrorMetadata(error));
+    }
     throw error;
   } finally {
     client.release();
@@ -83,6 +104,49 @@ export async function checkHealth(): Promise<boolean> {
   } catch (error) {
     console.error('Database health check failed', error);
     return false;
+  }
+}
+
+interface DatabaseRoleSecurity {
+  role_name: string;
+  is_superuser: boolean;
+  can_create_role: boolean;
+  can_create_db: boolean;
+  can_replicate: boolean;
+  can_bypass_rls: boolean;
+  can_create_public: boolean;
+  owns_database: boolean;
+  owned_objects: string | number;
+}
+
+/** Prove that the web process is not connected as an owner or administrator. */
+export async function assertRestrictedDatabaseRole(): Promise<void> {
+  const result = await pool.query<DatabaseRoleSecurity>(`
+    SELECT current_user AS role_name,
+           role.rolsuper AS is_superuser,
+           role.rolcreaterole AS can_create_role,
+           role.rolcreatedb AS can_create_db,
+           role.rolreplication AS can_replicate,
+           role.rolbypassrls AS can_bypass_rls,
+           has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_public,
+           database.datdba = role.oid AS owns_database,
+           (SELECT COUNT(*)
+              FROM pg_class object
+              JOIN pg_namespace namespace ON namespace.oid = object.relnamespace
+             WHERE object.relowner = role.oid
+               AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND namespace.nspname NOT LIKE 'pg_toast%') AS owned_objects
+      FROM pg_roles role
+      JOIN pg_database database ON database.datname = current_database()
+     WHERE role.rolname = current_user
+  `);
+  const role = result.rows[0];
+  if (!role) throw new Error('Unable to inspect the PostgreSQL runtime role.');
+  const unsafe = role.is_superuser || role.can_create_role || role.can_create_db ||
+    role.can_replicate || role.can_bypass_rls || role.can_create_public ||
+    role.owns_database || Number(role.owned_objects) > 0;
+  if (unsafe) {
+    throw new Error(`PostgreSQL runtime role '${role.role_name}' is privileged or owns schema objects.`);
   }
 }
 

@@ -59,7 +59,12 @@ export default function SettingsBlockchain() {
     setTestResult(null);
     setError('');
     try {
-      const res = await settingsApi.testBlockchainConnection(settings.rpc_url);
+      const rpcUrl = settings.rpc_url?.trim();
+      if (!rpcUrl) {
+        setError('RPC URL is required before testing the connection.');
+        return;
+      }
+      const res = await settingsApi.testBlockchainConnection(rpcUrl);
       setTestResult(res);
     } catch (e: unknown) {
       setError(errorMessage(e) || 'Connection test failed');

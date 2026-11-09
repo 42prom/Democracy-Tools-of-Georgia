@@ -53,8 +53,6 @@ export class BiometricService {
     // The "locked_until" field is the source of truth for active blocks.
 
     return { allowed: true };
-
-    return { allowed: true };
   }
 
   /**

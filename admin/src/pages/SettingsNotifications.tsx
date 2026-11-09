@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Save, AlertCircle, Info, Key, FileText, Send } from 'lucide-react';
+import { Bell, Save, AlertCircle, Info, Key, Send } from 'lucide-react';
 import { settingsApi } from '../api/client';
 
 export default function SettingsNotifications() {
@@ -15,7 +15,6 @@ export default function SettingsNotifications() {
     enabledPolls: true,
     enabledMessages: true,
     serviceAccountJson: '',
-    serviceAccountPath: '',
   });
 
   useEffect(() => {
@@ -33,7 +32,6 @@ export default function SettingsNotifications() {
           enabledPolls: data.push.enabledPolls ?? true,
           enabledMessages: data.push.enabledMessages ?? true,
           serviceAccountJson: data.push.serviceAccountJson || '',
-          serviceAccountPath: data.push.serviceAccountPath || '',
         });
       }
     } catch (err: any) {
@@ -68,10 +66,7 @@ export default function SettingsNotifications() {
       setError(null);
       setTestResult(null);
       
-      const result = await settingsApi.testNotificationsConnection(
-        config.serviceAccountJson,
-        config.serviceAccountPath
-      );
+      const result = await settingsApi.testNotificationsConnection(config.serviceAccountJson);
       
       setTestResult(result);
     } catch (err: any) {
@@ -151,7 +146,7 @@ export default function SettingsNotifications() {
               Firebase Cloud Messaging Credentials
             </div>
             
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Service Account JSON
@@ -171,24 +166,6 @@ export default function SettingsNotifications() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service Account Path
-                  </label>
-                  <div className="relative">
-                    <input
-                        type="text"
-                        value={config.serviceAccountPath}
-                        onChange={(e) => setConfig({ ...config, serviceAccountPath: e.target.value })}
-                        placeholder="/path/to/firebase-auth.json"
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                    />
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                        <FileText className="h-3 w-3 mr-1" />
-                        Absolute path on the server filesystem (Option A).
-                    </div>
-                  </div>
-                </div>
             </div>
 
             <div className="flex items-center justify-between bg-gray-50 p-4 rounded-md border border-gray-200">
@@ -205,7 +182,7 @@ export default function SettingsNotifications() {
                 </div>
                 <button
                     onClick={handleTestConnection}
-                    disabled={testing || (!config.serviceAccountJson && !config.serviceAccountPath)}
+                    disabled={testing || !config.serviceAccountJson}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
                 >
                     {testing ? (

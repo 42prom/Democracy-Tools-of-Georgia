@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/services/api_service.dart';
 import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/services/device_attestation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 
@@ -8,7 +9,7 @@ import 'package:flutter/services.dart';
 ///
 /// Requirements:
 /// 1. Flow order: challenge → issue → vote
-/// 2. Nullifier computed locally (never sent in plain)
+/// 2. Client sends no voter-derived pseudonymous identifier
 /// 3. NO userId/name/surname/pn/push token/wallet address in vote calls
 /// 4. NO biometric media stored/uploaded
 
@@ -46,6 +47,26 @@ void main() {
         }
       });
 
+  const MethodChannel attestationChannel = MethodChannel(
+    'messaging.dtg/device_attestation',
+  );
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(attestationChannel, (MethodCall call) async {
+        if (call.method == 'playIntegrityToken') {
+          final nonce = (call.arguments as Map)['nonce'] as String;
+          expect(nonce, matches(RegExp(r'^[a-f0-9]{64}$')));
+          return 'test-play-integrity-token';
+        }
+        throw PlatformException(code: 'UNSUPPORTED_METHOD');
+      });
+  DeviceAttestationService.debugPlatformOverride = 'android';
+
+  tearDownAll(() {
+    DeviceAttestationService.debugPlatformOverride = null;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(attestationChannel, null);
+  });
+
   group('Voting Flow Order Tests', () {
     late ApiService apiService;
     setUp(() {
@@ -73,19 +94,18 @@ void main() {
           timestampBucket: 123456,
           nonce: 'test_nonce',
         ),
-        containsPair('attestation', startsWith('mvp_attestation_')),
+        containsPair('attestation', 'test-play-integrity-token'),
       );
     });
 
     test(
-      'Step 5: Vote submission includes nullifier and attestation',
+      'Step 5: Vote submission requires payload-bound attestation',
       () async {
         // Verify vote method signature
         expect(
           () => apiService.submitVote(
             pollId: 'test_poll',
             optionId: 'opt_1',
-            nullifier: 'test_nullifier',
             attestation: 'test_attestation',
             timestampBucket: 123456,
           ),
@@ -95,87 +115,6 @@ void main() {
     );
   });
 
-  group('Nullifier Computation Tests', () {
-    late StorageService storageService;
-
-    setUp(() async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      storageService = StorageService();
-    });
-
-    test('Nullifier is computed locally', () async {
-      final pollId = 'test_poll_123';
-
-      // Compute nullifier
-      final nullifier = await storageService.computeNullifier(pollId);
-
-      // Verify it's a hash (64 hex characters for SHA256)
-      expect(nullifier, isA<String>());
-      expect(nullifier.length, greaterThan(0));
-      expect(
-        nullifier.contains(':'),
-        isFalse,
-        reason: 'Nullifier should be hashed, not plain text',
-      );
-    });
-
-    test('Same poll ID produces same nullifier', () async {
-      final pollId = 'test_poll_123';
-
-      final nullifier1 = await storageService.computeNullifier(pollId);
-      final nullifier2 = await storageService.computeNullifier(pollId);
-
-      expect(
-        nullifier1,
-        equals(nullifier2),
-        reason: 'Same poll should produce same nullifier',
-      );
-    });
-
-    test('Different poll IDs produce different nullifiers', () async {
-      final pollId1 = 'test_poll_1';
-      final pollId2 = 'test_poll_2';
-
-      final nullifier1 = await storageService.computeNullifier(pollId1);
-      final nullifier2 = await storageService.computeNullifier(pollId2);
-
-      expect(
-        nullifier1,
-        isNot(equals(nullifier2)),
-        reason: 'Different polls should produce different nullifiers',
-      );
-    });
-
-    test('Credential secret never leaves device', () async {
-      // Get secret
-      final secret = await storageService.getCredentialSecret();
-
-      // Verify it's stored locally
-      expect(secret, isA<String>());
-      expect(secret.isNotEmpty, isTrue);
-
-      // Verify secret is never exposed in API calls
-      // (This is verified by inspecting API method signatures)
-    });
-
-    test('Nullifier uses SHA256 hash', () async {
-      final pollId = 'test_poll';
-      final nullifier = await storageService.computeNullifier(pollId);
-
-      // SHA256 produces 64 hex characters
-      expect(
-        nullifier.length,
-        equals(64),
-        reason: 'SHA256 hash should be 64 hex characters',
-      );
-      expect(
-        RegExp(r'^[a-f0-9]+$').hasMatch(nullifier),
-        isTrue,
-        reason: 'Should be lowercase hex',
-      );
-    });
-  });
-
   group('Privacy Compliance Tests', () {
     setUpAll(() {
       TestWidgetsFlutterBinding.ensureInitialized();
@@ -183,7 +122,7 @@ void main() {
 
     test('Vote API call has NO user identity fields', () {
       // Verify submitVote method signature
-      // Required params: pollId, optionId, nullifier, attestation, timestampBucket
+      // Required params: pollId, optionId, attestation, timestampBucket
       // FORBIDDEN params: userId, name, surname, personalNumber, pushToken, walletAddress
 
       // This is enforced at compile time by method signature
@@ -218,14 +157,8 @@ void main() {
       final storageService = StorageService();
 
       // Verify only non-PII data is stored
-      final secret = await storageService.getCredentialSecret();
       final isEnrolled = await storageService.isEnrolled();
       final credential = await storageService.getCredential();
-
-      // All values should be non-biometric
-      expect(secret, isNot(contains('face')));
-      expect(secret, isNot(contains('fingerprint')));
-      expect(secret, isNot(contains('biometric')));
 
       expect(isEnrolled, isA<bool>());
       expect(credential, anyOf(isNull, isA<String>()));
@@ -236,20 +169,20 @@ void main() {
     test('Full voting flow follows correct order', () async {
       // This test documents the required flow order
       final flowSteps = [
-        '1. POST /api/v1/attestations/challenge',
+        '1. POST /api/v1/auth/challenge',
         '2. On-device NFC + 3D liveness + face match',
-        '3. POST /api/v1/attestations/issue',
-        '4. Compute nullifier locally',
-        '5. POST /api/v1/votes',
+        '3. Native hardware attestation bound to the vote payload',
+        '4. Prepare anonymous nonce-scoped submission',
+        '5. POST /api/v1/polls/:id/vote',
       ];
 
       // Verify all steps are documented
       expect(flowSteps.length, equals(5));
       expect(flowSteps[0], contains('challenge'));
       expect(flowSteps[1], contains('On-device'));
-      expect(flowSteps[2], contains('issue'));
-      expect(flowSteps[3], contains('Compute nullifier locally'));
-      expect(flowSteps[4], contains('votes'));
+      expect(flowSteps[2], contains('attestation'));
+      expect(flowSteps[3], contains('anonymous'));
+      expect(flowSteps[4], contains('vote'));
     });
 
     test('Vote cannot be submitted without attestation', () {
@@ -260,7 +193,6 @@ void main() {
         () => apiService.submitVote(
           pollId: 'test',
           optionId: 'opt1',
-          nullifier: 'nullifier',
           attestation: '', // Empty attestation should fail
           timestampBucket: 123,
         ),
@@ -268,10 +200,19 @@ void main() {
       );
     });
 
-    test('Vote cannot be submitted without nullifier', () {
-      // Verify nullifier is required parameter
-      // (Enforced by Dart type system - non-nullable String)
-      expect(true, isTrue, reason: 'Type system enforces non-null nullifier');
+    test('Vote idempotency key is nonce-scoped and deterministic', () {
+      expect(
+        DeviceAttestationService.buildVoteIdempotencyKey('poll-1', 'nonce-1'),
+        equals(
+          'vote-poll-1-73c80a38c94964e7fa9b83478d511dce4ba61608ec4867de735f41fa1e77e038',
+        ),
+      );
+      expect(
+        DeviceAttestationService.buildVoteIdempotencyKey('poll-1', 'nonce-2'),
+        isNot(
+          DeviceAttestationService.buildVoteIdempotencyKey('poll-1', 'nonce-1'),
+        ),
+      );
     });
   });
 
@@ -288,7 +229,7 @@ void main() {
           timestampBucket: 123,
           nonce: 'nonce',
         ),
-        containsPair('attestation', startsWith('mvp_attestation_')),
+        containsPair('attestation', 'test-play-integrity-token'),
       );
     });
 
@@ -300,9 +241,84 @@ void main() {
     });
 
     test('Attestation is bound to votePayloadHash', () {
-      // Attestation includes pollId + optionId + timestampBucket
-      // This creates the votePayloadHash binding
-      expect(true, isTrue, reason: 'Payload hash prevents vote tampering');
+      final first = DeviceAttestationService.buildVoteBinding(
+        nonce: 'nonce',
+        pollId: 'poll',
+        optionId: 'option-a',
+        timestampBucket: 123,
+      );
+      final changed = DeviceAttestationService.buildVoteBinding(
+        nonce: 'nonce',
+        pollId: 'poll',
+        optionId: 'option-b',
+        timestampBucket: 123,
+      );
+      expect(first, matches(RegExp(r'^[a-f0-9]{64}$')));
+      expect(changed, isNot(first));
+    });
+
+    test('Survey attestation binds every canonical response', () {
+      final first = [
+        <String, dynamic>{'questionId': 'q2', 'textResponse': 'გამარჯობა'},
+        <String, dynamic>{
+          'questionId': 'q1',
+          'selectedOptionIds': ['b', 'a'],
+        },
+      ];
+      final reordered = [
+        <String, dynamic>{
+          'questionId': 'q1',
+          'selectedOptionIds': ['a', 'b'],
+        },
+        <String, dynamic>{'questionId': 'q2', 'textResponse': 'გამარჯობა'},
+      ];
+      final changed = [
+        <String, dynamic>{
+          'questionId': 'q1',
+          'selectedOptionIds': ['a', 'b'],
+        },
+        <String, dynamic>{
+          'questionId': 'q2',
+          'textResponse': 'შეცვლილი პასუხი',
+        },
+      ];
+
+      final digest = DeviceAttestationService.buildSurveyResponseDigest(first);
+      expect(
+        digest,
+        '7fcb4aeaa04248ffb36c44da8f4a83a2853f3f048f98cdaf2a1685b061b0fa8d',
+      );
+      expect(
+        DeviceAttestationService.buildSurveyResponseDigest(reordered),
+        digest,
+      );
+      expect(
+        DeviceAttestationService.buildSurveyResponseDigest(changed),
+        isNot(digest),
+      );
+      expect(
+        DeviceAttestationService.buildSurveyAttestationOption(first),
+        'survey:$digest',
+      );
+    });
+
+    test('Survey binding preserves ranked-choice order', () {
+      final first = [
+        <String, dynamic>{
+          'questionId': 'rank',
+          'rankedOptionIds': ['a', 'b'],
+        },
+      ];
+      final changed = [
+        <String, dynamic>{
+          'questionId': 'rank',
+          'rankedOptionIds': ['b', 'a'],
+        },
+      ];
+      expect(
+        DeviceAttestationService.buildSurveyResponseDigest(first),
+        isNot(DeviceAttestationService.buildSurveyResponseDigest(changed)),
+      );
     });
 
     test('Attestation has TTL', () {
@@ -317,28 +333,38 @@ void main() {
       TestWidgetsFlutterBinding.ensureInitialized();
     });
 
-    test('Credential secret is unique per device', () async {
+    test('Installation identifier is unique per enrollment', () async {
       final storage1 = StorageService();
       final storage2 = StorageService();
 
-      final secret1 = await storage1.getCredentialSecret();
-      // Clear and regenerate
+      final installationId1 = await storage1.getOrCreateInstallationId();
       await storage1.clearAll();
-      final secret2 = await storage2.getCredentialSecret();
+      final installationId2 = await storage2.getOrCreateInstallationId();
 
-      // After clear, new secret is generated
       expect(
-        secret1,
-        isNot(equals(secret2)),
-        reason: 'Each enrollment should have unique secret',
+        installationId1,
+        isNot(equals(installationId2)),
+        reason: 'Each enrollment should have a unique random installation ID',
       );
     });
 
-    test('Vote submission has NO credential header', () {
-      // Vote submission should be anonymous
-      // Verified by inspecting submitVote implementation
-      // It should NOT include Authorization header
-      expect(true, isTrue, reason: 'Vote API enforces anonymity');
+    test('Upgrade cleanup removes the obsolete voting secret', () async {
+      fakeSecure['credential_secret'] = 'legacy-client-nullifier-secret';
+      await StorageService().purgeLegacyVotingSecrets();
+      expect(fakeSecure, isNot(contains('credential_secret')));
+    });
+
+    test('Vote submission requires an authenticated credential', () {
+      final apiService = ApiService();
+      expect(
+        () => apiService.submitVote(
+          pollId: 'test',
+          optionId: 'opt1',
+          attestation: 'token',
+          timestampBucket: 123,
+        ),
+        throwsA(anything),
+      );
     });
   });
 
@@ -346,15 +372,15 @@ void main() {
     test('Missing nonce throws error', () async {
       final apiService = ApiService();
 
-      // Nonce is required (non-nullable)
-      // In Phase 0, we don't throw yet for empty nonce, but we verify it's returned
-      final result = await apiService.issueAttestation(
-        pollId: 'test',
-        optionId: 'opt',
-        timestampBucket: 123,
-        nonce: '',
+      await expectLater(
+        apiService.issueAttestation(
+          pollId: 'test',
+          optionId: 'opt',
+          timestampBucket: 123,
+          nonce: '',
+        ),
+        throwsArgumentError,
       );
-      expect(result['nonce'], '');
     });
 
     test('Invalid attestation throws error', () {
@@ -364,7 +390,6 @@ void main() {
         () => apiService.submitVote(
           pollId: 'test',
           optionId: 'opt',
-          nullifier: 'test_nullifier',
           attestation: 'invalid',
           timestampBucket: 123,
         ),

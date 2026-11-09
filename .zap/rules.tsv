@@ -1,0 +1,9 @@
+# ZAP passive scanner rule configuration for the isolated admin-image baseline.
+# Rule ID<TAB>ACTION<TAB>COMMENT
+10020	FAIL	Missing anti-clickjacking header
+10021	FAIL	Missing X-Content-Type-Options header
+10023	FAIL	Information disclosure in debug/error response
+10035	FAIL	Missing or invalid HSTS policy
+10038	FAIL	Missing or unsafe Content-Security-Policy
+10049	FAIL	Authentication credentials stored by a shared cache
+10055	FAIL	CSP contains a wildcard directive

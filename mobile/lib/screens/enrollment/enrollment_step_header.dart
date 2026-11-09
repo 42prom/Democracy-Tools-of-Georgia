@@ -44,9 +44,15 @@ class EnrollmentStepHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.72))),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.72)),
+                ),
               ],
             ),
           ),

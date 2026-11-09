@@ -3,7 +3,7 @@ import { Users, Search, Download, Upload, X, Eye, Filter, RefreshCw, Trash2 } fr
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { profilesApi, regionsApi } from '../api/client';
+import { adminFetch, profilesApi, regionsApi } from '../api/client';
 import type { UserProfile, ProfileFilters, Region } from '../types';
 
 export default function Profiles() {
@@ -118,50 +118,27 @@ export default function Profiles() {
   const handleExportAggregated = async () => {
     setExporting(true);
     try {
-      // Use the CSV export endpoint with auth header
-      const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/export/users.csv', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await adminFetch('/api/v1/admin/export/users-aggregated.csv', {
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'text/csv',
+        },
       });
+      if (!response.ok) {
+        throw new Error(`Export rejected with HTTP ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `users-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `users-aggregated-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to export:', error);
       alert('Failed to export data.');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleExportProfileList = async () => {
-    if (!confirm('Profile list export is a restricted operation and will be audit-logged. Continue?')) {
-      return;
-    }
-
-    setExporting(true);
-    try {
-      // Use the CSV export endpoint with auth header
-      const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken');
-      const response = await fetch('/api/v1/admin/export/users.csv', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `users-export-restricted-${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error('Failed to export:', error);
-      alert('Failed to export profile list.');
     } finally {
       setExporting(false);
     }
@@ -250,7 +227,6 @@ export default function Profiles() {
     const apiUrl = `/api/v1/admin/profiles/${selectedProfile.id}/reset-security`;
     console.log('[Reset Security] Making request to:', apiUrl);
     console.log('[Reset Security] Profile ID:', selectedProfile.id);
-    console.log('[Reset Security] Token present:', !!(localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken')));
 
     try {
       const result = await profilesApi.resetSecurity(selectedProfile.id, false);
@@ -304,7 +280,7 @@ export default function Profiles() {
     }
   };
 
-  if (loading && page === 1) {
+  if (loading && page === 1 && profiles.length === 0) {
     return (
       <div className="p-6">
         <div className="mb-6">
@@ -338,6 +314,8 @@ export default function Profiles() {
             />
             {searchQuery && (
               <button
+                type="button"
+                aria-label="Clear profile search"
                 onClick={() => {
                   setSearchQuery('');
                   setFilters({ ...filters, search: '' });
@@ -364,10 +342,11 @@ export default function Profiles() {
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="profiles-age-filter" className="block text-sm font-medium text-gray-700 mb-1">
                     Age Bucket
                   </label>
                   <select
+                    id="profiles-age-filter"
                     value={filters.ageBucket || ''}
                     onChange={(e) => setFilters({ ...filters, ageBucket: e.target.value || undefined })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -383,10 +362,11 @@ export default function Profiles() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="profiles-gender-filter" className="block text-sm font-medium text-gray-700 mb-1">
                     Gender
                   </label>
                   <select
+                    id="profiles-gender-filter"
                     value={filters.genderBucket || ''}
                     onChange={(e) => setFilters({ ...filters, genderBucket: (e.target.value as 'M' | 'F' | 'Other') || undefined })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -399,10 +379,11 @@ export default function Profiles() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="profiles-region-filter" className="block text-sm font-medium text-gray-700 mb-1">
                     Region
                   </label>
                   <input
+                    id="profiles-region-filter"
                     type="text"
                     placeholder="e.g., reg_tbilisi"
                     value={filters.regionBucket || ''}
@@ -414,10 +395,11 @@ export default function Profiles() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="profiles-login-from-filter" className="block text-sm font-medium text-gray-700 mb-1">
                     Last Login From
                   </label>
                   <input
+                    id="profiles-login-from-filter"
                     type="date"
                     value={filters.lastLoginStart || ''}
                     onChange={(e) => setFilters({ ...filters, lastLoginStart: e.target.value || undefined })}
@@ -426,10 +408,11 @@ export default function Profiles() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="profiles-login-to-filter" className="block text-sm font-medium text-gray-700 mb-1">
                     Last Login To
                   </label>
                   <input
+                    id="profiles-login-to-filter"
                     type="date"
                     value={filters.lastLoginEnd || ''}
                     onChange={(e) => setFilters({ ...filters, lastLoginEnd: e.target.value || undefined })}
@@ -463,10 +446,6 @@ export default function Profiles() {
             <Button variant="secondary" onClick={handleExportAggregated} disabled={exporting}>
               <Download className="w-4 h-4 mr-2" />
               Export Aggregated
-            </Button>
-            <Button variant="secondary" onClick={handleExportProfileList} disabled={exporting}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Profile List (Restricted)
             </Button>
           </div>
         </div>
@@ -522,6 +501,8 @@ export default function Profiles() {
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        type="button"
+                        aria-label={`View participation for ${profile.personalNumberMasked}`}
                         onClick={() => handleViewParticipation(profile)}
                         className="p-1 text-gray-600 hover:text-primary-600"
                         title="View participation details"

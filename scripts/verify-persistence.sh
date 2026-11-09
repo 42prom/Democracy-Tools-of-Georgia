@@ -3,24 +3,23 @@
 # Tests that regions and profiles persist across server restarts.
 #
 # Prerequisites:
-#   - Docker container 'DTG-postgres' running
+#   - Compose service 'postgres' running
 #
 # Usage:
 #   bash scripts/verify-persistence.sh
 
 set -e
 
-# DB_URL is not used with docker exec, but we keep the var for reference if needed later
-DB_USER="DTG_user"
-DB_NAME="DTG"
-CONTAINER_NAME="DTG-postgres"
+DB_USER="${DB_USER:-dtg_user}"
+DB_NAME="${DB_NAME:-dtg}"
+COMPOSE=(docker compose)
 
 PASS=0
 FAIL=0
 
 run_sql() {
-  # Use docker exec to avoid local psql dependency and auth issues
-  docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "$1" 2>/dev/null
+  # Resolve the service through Compose so project/container names never collide.
+  "${COMPOSE[@]}" exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "$1" 2>/dev/null
 }
 
 check() {
@@ -42,18 +41,18 @@ echo ""
 # -------------------------------------------------------
 echo "1. Checking database connection..."
 # We check if container is running first
-if ! docker ps | grep -q "$CONTAINER_NAME"; then
-  echo "  ERROR: Container $CONTAINER_NAME is not running."
-  echo "  Run: docker-compose up -d postgres"
+if ! "${COMPOSE[@]}" ps --services --status running | grep -qx "postgres"; then
+  echo "  ERROR: Compose service 'postgres' is not running."
+  echo "  Run: docker compose up -d postgres"
   exit 1
 fi
 
 DB_OK=$(run_sql "SELECT 1" || echo "error")
 if [ "$DB_OK" != "1" ]; then
-  echo "  ERROR: Cannot connect to database inside $CONTAINER_NAME"
+  echo "  ERROR: Cannot connect to database through Compose service 'postgres'"
   exit 1
 fi
-echo "  OK: Connected to database ($CONTAINER_NAME)"
+echo "  OK: Connected to database (Compose service postgres)"
 echo ""
 
 # -------------------------------------------------------
@@ -111,10 +110,10 @@ echo ""
 
 # -------------------------------------------------------
 echo "6. Checking Docker volume persistence..."
-# Use grep loosely to find any volume containing "postgres_data"
-VOL_EXISTS=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -c "postgres_data" || echo "0")
-if [ "$VOL_EXISTS" -ge 1 ]; then
-  echo "  OK: Docker volume(s) found for postgres_data (data survives container restarts)"
+POSTGRES_CONTAINER=$("${COMPOSE[@]}" ps -q postgres)
+POSTGRES_VOLUME=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' "$POSTGRES_CONTAINER" 2>/dev/null || true)
+if [ -n "$POSTGRES_VOLUME" ]; then
+  echo "  OK: Docker volume '$POSTGRES_VOLUME' is mounted (data survives container restarts)"
 else
   echo "  WARN: Docker volume 'postgres_data' not found (are you using Docker?)"
 fi
@@ -122,7 +121,7 @@ echo ""
 
 # -------------------------------------------------------
 echo "7. Checking migration idempotency (004 must NOT have unconditional DROP)..."
-HAS_DROP=$(grep -c "^DROP TABLE IF EXISTS users" "db/migrations/004_identity_system.sql" 2>/dev/null || echo "0")
+HAS_DROP=$(grep -c "^DROP TABLE IF EXISTS users" "backend/db/migrations/004_identity_system.sql" 2>/dev/null || echo "0")
 check "Migration 004 has no unconditional DROP TABLE" "0" "$HAS_DROP"
 echo ""
 

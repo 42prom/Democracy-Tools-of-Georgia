@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import pool from '../db/client';
+import pool, { transaction } from '../db/client';
 import { createError } from '../middleware/errorHandler';
 import { getDeviceHashSecret, getVoterHashSecret } from '../config/secrets';
 
@@ -8,14 +8,11 @@ import { getDeviceHashSecret, getVoterHashSecret } from '../config/secrets';
  * Includes heavy debug logging for verification as requested by user.
  */
 export class SecurityService {
-  private static readonly DEVICE_SECRET = getDeviceHashSecret();
-  private static readonly VOTER_SECRET = getVoterHashSecret();
-
   /**
    * Derive privacy-safe hash for a device identifier
    */
   static getDeviceHash(deviceId: string): string {
-    const hash = crypto.createHmac('sha256', this.DEVICE_SECRET).update(deviceId).digest('hex');
+    const hash = crypto.createHmac('sha256', getDeviceHashSecret()).update(deviceId).digest('hex');
     return hash;
   }
 
@@ -23,7 +20,7 @@ export class SecurityService {
    * Derive privacy-safe hash for a voter (identity)
    */
   static getVoterHash(personalNumber: string): string {
-    const hash = crypto.createHmac('sha256', this.VOTER_SECRET).update(personalNumber).digest('hex');
+    const hash = crypto.createHmac('sha256', getVoterHashSecret()).update(personalNumber).digest('hex');
     return hash;
   }
 
@@ -95,10 +92,23 @@ export class SecurityService {
    */
   static async logAuditEvent(eventType: string, payload: any): Promise<void> {
     try {
-      await SecurityService._writeAuditEntry(pool, eventType, payload);
+      await transaction(async client => {
+        await SecurityService._writeAuditEntry(client, eventType, payload);
+      });
     } catch (err) {
       console.error('[Security] Failed to write audit log:', err);
     }
+  }
+
+  /**
+   * Append an audit event and propagate any storage failure. Control-plane
+   * mutations call this before execution so an action cannot proceed when the
+   * audit ledger is unavailable.
+   */
+  static async logAuditEventStrict(eventType: string, payload: any): Promise<void> {
+    await transaction(async client => {
+      await SecurityService._writeAuditEntry(client, eventType, payload);
+    });
   }
 
   /**
@@ -132,6 +142,10 @@ export class SecurityService {
     eventType: string,
     payload: any
   ): Promise<void> {
+    // Serialize the global hash chain. Without this transaction-scoped lock,
+    // concurrent events can read the same previous hash and fork the chain.
+    await db.query('SELECT pg_advisory_xact_lock(752991884322001::bigint)');
+
     // Fetch the hash of the most recent audit row (chain link)
     const prevRes = await db.query(
       `SELECT row_hash FROM audit_log ORDER BY id DESC LIMIT 1`

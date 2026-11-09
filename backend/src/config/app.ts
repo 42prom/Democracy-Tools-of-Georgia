@@ -15,6 +15,7 @@ export const AppConfig = {
 
   // Security
   CORS_ORIGINS: process.env.CORS_ORIGIN?.split(',') || [],
+  TRUST_PROXY_HOPS: parseInt(process.env.TRUST_PROXY_HOPS || '0', 10),
   
   // Flags
   ALLOW_MOCK_LOGIN: process.env.ALLOW_MOCK_LOGIN === 'true',

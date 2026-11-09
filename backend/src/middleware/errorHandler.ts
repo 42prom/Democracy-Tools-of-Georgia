@@ -22,32 +22,27 @@ export function errorHandler(
   // Default to 500 server error
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const exposedMessage = isProduction && statusCode >= 500 ? 'Internal Server Error' : message;
 
   // Log error details
-  console.error('Error:', {
+  const logEntry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     method: req.method,
     path: req.path,
     statusCode,
     message,
-    stack: err.stack,
-  });
-
-  // Special logging for the current investigation
-  if (message && message.includes('length')) {
-    const report = `\n\n[${new Date().toISOString()}] CRASH REPORT:\nMessage: ${message}\nStack: ${err.stack}\n========================\n\n`;
-    console.error(report);
-    try {
-      require('fs').appendFileSync('DEBUG_POLL_SAFE.txt', report);
-    } catch (e) {
-      console.error('Failed to write crash log:', e);
-    }
+    code: err.code,
+  };
+  if (!isProduction && err.stack) {
+    logEntry.stack = err.stack;
   }
+  console.error('Error:', logEntry);
 
   // Send sanitized error response
   const response: any = {
     error: {
-      message,
+      message: exposedMessage,
       statusCode,
     },
   };
@@ -55,7 +50,7 @@ export function errorHandler(
   if (err.code) {
     response.error.code = err.code;
   }
-  if (err.details !== undefined) {
+  if (err.details !== undefined && (!isProduction || statusCode < 500)) {
     response.error.details = err.details;
   }
 

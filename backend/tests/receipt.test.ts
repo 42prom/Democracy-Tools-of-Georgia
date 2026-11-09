@@ -1,4 +1,4 @@
-import { signReceipt, verifyReceipt, generateReceiptKeypair, SignedReceipt, ReceiptPayload } from '../src/services/receiptSigner';
+import { assertReceiptSigningConfigured, signReceipt, verifyReceipt, generateReceiptKeypair, SignedReceipt, ReceiptPayload } from '../src/services/receiptSigner';
 
 /**
  * Unit tests for the Ed25519 cryptographic receipt signer.
@@ -27,6 +27,16 @@ const samplePayload: ReceiptPayload = {
 };
 
 describe('ReceiptSigner', () => {
+
+  it('should validate that the configured signing keys match', () => {
+    expect(() => assertReceiptSigningConfigured(privateKeyPem, publicKeyPem)).not.toThrow();
+  });
+
+  it('should reject a mismatched signing key pair', () => {
+    const other = generateReceiptKeypair();
+    expect(() => assertReceiptSigningConfigured(privateKeyPem, other.publicKeyPem))
+      .toThrow(/do not form a matching key pair/);
+  });
 
   describe('signReceipt', () => {
     it('should return a SignedReceipt with algorithm Ed25519 and version 1', () => {

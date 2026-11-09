@@ -68,9 +68,8 @@ export interface Vote {
 export interface VoteSubmission {
   pollId: string;
   optionId: string;
-  /** @deprecated Server now computes the nullifier. This field is ignored if present. */
-  nullifier?: string;
   nonce: string;
+  timestampBucket: number;
   signature: string;
   device?: {
     id: string;

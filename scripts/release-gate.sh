@@ -1,70 +1,52 @@
-#!/bin/bash
-# scripts/release-gate.sh
-# Verifies that all components build and pass static analysis.
+#!/usr/bin/env bash
+# Deterministic local/CI release gate. Set SKIP_MOBILE=1 only for the
+# explicitly scoped admin/backend gate; a full release never skips mobile.
 
-set -e
-set -x  # Debug mode
+set -euo pipefail
 
-echo "============================================"
-echo "      DTFG RELEASE GATE VERIFICATION        "
-echo "============================================"
-echo ""
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
 
-# 1. Backend Verification
-echo ">>> [1/3] Checking Backend..."
-if [ -d "backend" ]; then
-  cd backend
-  if [ ! -d "node_modules" ]; then
-    echo "Installing backend dependencies..."
-    npm ci
+run_node_gate() {
+  local component="$1"
+  pushd "$component" >/dev/null
+  if [[ ! -d node_modules ]]; then
+    npm ci --ignore-scripts
   fi
-  echo "Building backend..."
-  npm run build
-  cd ..
-  echo "✅ Backend passed."
-else
-  echo "⚠️  Backend directory not found!"
-  exit 1
-fi
-echo ""
-
-# 2. Admin Verification
-echo ">>> [2/3] Checking Admin Panel..."
-if [ -d "admin" ]; then
-  cd admin
-  if [ ! -d "node_modules" ]; then
-    echo "Installing admin dependencies..."
-    npm ci --silent
-  fi
-  echo "Building admin panel..."
-  npm run build
-  cd ..
-  echo "✅ Admin passed."
-else
-  echo "⚠️  Admin directory not found!"
-  exit 1
-fi
-echo ""
-
-# 3. Mobile Verification
-echo ">>> [3/3] Checking Mobile App..."
-if [ -d "mobile" ]; then
-  cd mobile
-  # Check if flutter is available
-  if command -v flutter &> /dev/null; then
-    echo "Running Flutter analysis..."
-    flutter analyze
-    echo "✅ Mobile passed."
+  npm audit --omit=dev --audit-level=high
+  npm run lint
+  npx tsc --noEmit
+  if [[ "$component" == "backend" ]]; then
+    npm test -- --runInBand
   else
-    echo "⚠️  Flutter not found in PATH. Skipping mobile check."
+    npm test
   fi
-  cd ..
-else
-  echo "⚠️  Mobile directory not found!"
-  exit 1
-fi
-echo ""
+  npm run build
+  popd >/dev/null
+}
 
-echo "============================================"
-echo "   🎉 ALL TRUNK RESIDENT CHECKS PASSED      "
-echo "============================================"
+echo "[1/4] Backend security, tests, and build"
+run_node_gate backend
+
+echo "[2/4] Admin security, tests, and build"
+run_node_gate admin
+
+echo "[3/4] Docker Compose validation"
+docker compose --env-file .env.example config --quiet
+
+echo "[4/4] Mobile static and unit tests"
+if [[ "${SKIP_MOBILE:-0}" == "1" ]]; then
+  echo "Mobile gate explicitly skipped (admin/backend scope only)."
+else
+  if ! command -v flutter >/dev/null 2>&1; then
+    echo "Flutter is required for a full release gate." >&2
+    exit 1
+  fi
+  pushd mobile >/dev/null
+  flutter pub get
+  dart analyze lib test integration_test
+  flutter test --reporter compact
+  popd >/dev/null
+fi
+
+echo "Release gate passed."

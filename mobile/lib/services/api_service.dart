@@ -4,11 +4,19 @@ import 'package:http/http.dart' as http;
 import '../models/poll.dart';
 import '../models/ticket.dart';
 import '../config/app_config.dart';
+import 'device_attestation_service.dart';
+import 'storage_service.dart';
 
 class ApiService {
   static String get baseUrl => AppConfig.apiBaseUrl;
 
   String? _credential;
+  String? _lastVoteNonce;
+  String? _lastVotePollId;
+  DeviceAttestationEvidence? _lastAttestationEvidence;
+  int? _lastAttestationTimestampBucket;
+  String? _lastAttestationOptionId;
+  final StorageService _storage = StorageService();
 
   void setCredential(String credential) {
     _credential = credential;
@@ -63,7 +71,10 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_credential',
       },
-      body: json.encode({'deviceId': 'mobile', 'purpose': 'vote'}),
+      body: json.encode({
+        'deviceId': await _storage.getOrCreateInstallationId(),
+        'purpose': 'vote',
+      }),
     );
 
     if (response.statusCode == 200) {
@@ -82,27 +93,54 @@ class ApiService {
     required int timestampBucket,
     required String nonce,
   }) async {
-    // Backend no longer issues vote attestations in Phase 0.
-    // Keep for compatibility.
+    if (nonce.trim().isEmpty) throw ArgumentError('Nonce must not be empty');
+    if (pollId.trim().isEmpty || optionId.trim().isEmpty) {
+      throw ArgumentError('Poll and option must not be empty');
+    }
+    final binding = DeviceAttestationService.buildVoteBinding(
+      nonce: nonce,
+      pollId: pollId,
+      optionId: optionId,
+      timestampBucket: timestampBucket,
+    );
+    final evidence = await DeviceAttestationService.getAttestationEvidence(
+      binding,
+    );
+    _lastVoteNonce = nonce;
+    _lastVotePollId = pollId;
+    _lastAttestationEvidence = evidence;
+    _lastAttestationTimestampBucket = timestampBucket;
+    _lastAttestationOptionId = optionId;
     return {
-      'attestation': 'mvp_attestation_${DateTime.now().millisecondsSinceEpoch}',
+      'attestation': evidence.token,
+      'platform': evidence.platform,
+      'provider': evidence.provider,
       'nonce': nonce,
     };
   }
 
-  /// Step 5: Submit vote with attestation and nullifier
-  /// POST /api/v1/votes
-  /// Step 5: Submit vote
+  /// Step 5: Submit a vote with payload-bound hardware attestation.
   /// POST /api/v1/polls/:id/vote
   Future<Map<String, dynamic>> submitVote({
     required String pollId,
     required String optionId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
   }) async {
     if (_credential == null) {
       throw Exception('Not authenticated');
+    }
+    final nonce = _lastVoteNonce;
+    final evidence = _lastAttestationEvidence;
+    if (nonce == null || _lastVotePollId != pollId) {
+      throw Exception('Missing poll-bound vote nonce');
+    }
+    if (evidence == null || evidence.token != attestation) {
+      throw Exception('Missing or mismatched hardware attestation');
+    }
+    if (_lastAttestationTimestampBucket != timestampBucket ||
+        _lastAttestationOptionId != optionId) {
+      throw Exception('Attestation is not bound to this vote payload');
     }
 
     final response = await http.post(
@@ -110,43 +148,98 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_credential',
+        'X-Idempotency-Key': DeviceAttestationService.buildVoteIdempotencyKey(
+          pollId,
+          nonce,
+        ),
       },
       body: json.encode({
         'pollId': pollId,
         'optionId': optionId,
-        'nullifier': nullifier,
-        'nonce': 'vote_nonce_not_set',
+        'nonce': nonce,
+        'timestampBucket': timestampBucket,
         'signature': attestation,
+        'device': {
+          'id': await _storage.getOrCreateInstallationId(),
+          'platform': evidence.platform,
+          'provider': evidence.provider,
+        },
+        'attestation': {'token': evidence.token},
       }),
     );
 
+    _lastVoteNonce = null;
+    _lastVotePollId = null;
+    _lastAttestationEvidence = null;
+    _lastAttestationTimestampBucket = null;
+    _lastAttestationOptionId = null;
+
     if (response.statusCode == 200) {
+      if (evidence.platform == 'ios') {
+        await DeviceAttestationService.confirmAppAttestRegistration();
+      }
       return json.decode(response.body);
     } else {
       throw Exception('Failed to submit vote: ${response.body}');
     }
   }
 
-  /// Submit survey responses anonymously
+  /// Submit authenticated survey responses; the backend derives its nullifier.
   /// POST /api/v1/polls/:id/survey-submit
   Future<Map<String, dynamic>> submitSurvey({
     required String pollId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
     required List<Map<String, dynamic>> responses,
   }) async {
-    // NO credential sent - survey submission is anonymous
+    if (_credential == null) throw Exception('Not authenticated');
+    final nonce = _lastVoteNonce;
+    final evidence = _lastAttestationEvidence;
+    if (nonce == null || _lastVotePollId != pollId) {
+      throw Exception('Missing poll-bound survey nonce');
+    }
+    final expectedAttestationOption =
+        DeviceAttestationService.buildSurveyAttestationOption(responses);
+    if (evidence == null ||
+        evidence.token != attestation ||
+        _lastAttestationOptionId != expectedAttestationOption ||
+        _lastAttestationTimestampBucket != timestampBucket) {
+      throw Exception('Missing or mismatched survey attestation');
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/polls/$pollId/survey-submit'),
       headers: {
         'Content-Type': 'application/json',
-        if (_credential != null) 'Authorization': 'Bearer $_credential',
+        'Authorization': 'Bearer $_credential',
+        'X-Idempotency-Key': DeviceAttestationService.buildSurveyIdempotencyKey(
+          pollId,
+          nonce,
+        ),
       },
-      body: json.encode({'nullifier': nullifier, 'responses': responses}),
+      body: json.encode({
+        'responses': responses,
+        'nonce': nonce,
+        'timestampBucket': timestampBucket,
+        'signature': attestation,
+        'device': {
+          'id': await _storage.getOrCreateInstallationId(),
+          'platform': evidence.platform,
+          'provider': evidence.provider,
+        },
+        'attestation': {'token': evidence.token},
+      }),
     );
 
+    _lastVoteNonce = null;
+    _lastVotePollId = null;
+    _lastAttestationEvidence = null;
+    _lastAttestationTimestampBucket = null;
+    _lastAttestationOptionId = null;
+
     if (response.statusCode == 200) {
+      if (evidence.platform == 'ios') {
+        await DeviceAttestationService.confirmAppAttestRegistration();
+      }
       return json.decode(response.body);
     } else {
       throw Exception('Failed to submit survey: ${response.body}');
@@ -230,7 +323,9 @@ class ApiService {
 
   /// Add response to a ticket
   Future<Map<String, dynamic>> respondToTicket(
-      String ticketId, String message) async {
+    String ticketId,
+    String message,
+  ) async {
     if (_credential == null) {
       throw Exception('Not authenticated');
     }

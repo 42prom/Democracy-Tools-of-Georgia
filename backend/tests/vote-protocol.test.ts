@@ -42,13 +42,15 @@ jest.mock('../src/services/receiptSigner', () => ({
   }),
 }));
 
-import { submitVote } from '../src/services/voting';
+import { buildVoteAttestationBinding, submitVote } from '../src/services/voting';
 import { query, transaction } from '../src/db/client';
 import NonceService from '../src/services/nonce';
+import { signReceipt } from '../src/services/receiptSigner';
 
 const mockedQuery = query as jest.Mock;
 const mockedTransaction = transaction as jest.Mock;
 const mockedNonce = NonceService.verifyAndConsume as jest.Mock;
+const mockedSignReceipt = signReceipt as jest.Mock;
 
 describe('Vote Protocol (Comprehensive)', () => {
   beforeEach(() => {
@@ -75,6 +77,20 @@ describe('Vote Protocol (Comprehensive)', () => {
     } 
   };
 
+  it('cryptographically binds attestation to nonce, poll, option, and time bucket', () => {
+    const base = {
+      nonce: 'nonce-1',
+      pollId: 'poll-1',
+      optionId: 'option-1',
+      timestampBucket: 123,
+    };
+    const binding = buildVoteAttestationBinding(base);
+    expect(binding).toMatch(/^[a-f0-9]{64}$/);
+    expect(buildVoteAttestationBinding(base)).toBe(binding);
+    expect(buildVoteAttestationBinding({ ...base, optionId: 'option-2' })).not.toBe(binding);
+    expect(buildVoteAttestationBinding({ ...base, timestampBucket: 124 })).not.toBe(binding);
+  });
+
   it('should pass happy path (200 OK)', async () => {
     mockedQuery.mockImplementation(async (q) => {
       if (q.includes('FROM polls')) {
@@ -92,21 +108,36 @@ describe('Vote Protocol (Comprehensive)', () => {
       return { rows: [], rowCount: 0 };
     });
 
+    let transactionQuery: jest.Mock;
     mockedTransaction.mockImplementation(async (cb) => {
-      const client = { 
-        query: jest.fn()
+      transactionQuery = jest.fn()
           .mockImplementation(async (q) => {
             if (q.includes('RETURNING id')) return { rows: [{ id: 'v1' }], rowCount: 1 };
-            if (q.includes('FROM votes')) return { rows: [], rowCount: 0 };
+            if (q.includes('FROM polls')) {
+              return {
+                rows: [{ status: 'active', start_at: null, end_at: null, rewards_enabled: false }],
+                rowCount: 1,
+              };
+            }
+            if (q.includes('FROM votes')) {
+              return { rows: [{ vote_hash: 'a'.repeat(64) }], rowCount: 1 };
+            }
             return { rows: [], rowCount: 1 };
-          })
-      };
+          });
+      const client = { query: transactionQuery };
       return await cb(client as any);
     });
 
     const res = await submitVote(validVote as any, userContext as any);
     expect(res).toBeDefined();
     expect(res.txHash).toBe('v1');
+    expect(transactionQuery!).toHaveBeenCalledWith(
+      expect.stringContaining('pg_advisory_xact_lock'),
+      ['p1']
+    );
+    expect(transactionQuery!.mock.calls.some(([sql]) =>
+      sql.includes('ORDER BY bucket_ts ASC, id ASC')
+    )).toBe(true);
   });
 
   it('should fail if nonce is used', async () => {
@@ -152,5 +183,42 @@ describe('Vote Protocol (Comprehensive)', () => {
     });
 
     await expect(submitVote(validVote as any, userContext as any)).rejects.toThrow();
+  });
+
+  it('should abort instead of returning an unsigned receipt when signing fails', async () => {
+    mockedQuery.mockImplementation(async (q) => {
+      if (q.includes('FROM polls')) {
+        return { rows: [{ id: 'p1', status: 'active', audience_rules: {}, rewards_enabled: false }], rowCount: 1 };
+      }
+      if (q.includes('FROM poll_options')) return { rows: [{ id: 'o1' }], rowCount: 1 };
+      if (q.includes('FROM settings')) return { rows: [], rowCount: 0 };
+      if (q.includes('FROM poll_participants')) return { rows: [], rowCount: 0 };
+      return { rows: [], rowCount: 0 };
+    });
+
+    mockedTransaction.mockImplementation(async (callback) => {
+      const client = {
+        query: jest.fn().mockImplementation(async (q) => {
+          if (q.includes('RETURNING id')) return { rows: [{ id: 'v1' }], rowCount: 1 };
+          if (q.includes('FROM polls')) {
+            return {
+              rows: [{ status: 'active', start_at: null, end_at: null, rewards_enabled: false }],
+              rowCount: 1,
+            };
+          }
+          if (q.includes('FROM votes')) {
+            return { rows: [{ vote_hash: 'a'.repeat(64) }], rowCount: 1 };
+          }
+          return { rows: [], rowCount: 1 };
+        }),
+      };
+      return callback(client as any);
+    });
+    mockedSignReceipt.mockImplementationOnce(() => {
+      throw new Error('signer unavailable');
+    });
+
+    await expect(submitVote(validVote as any, userContext as any))
+      .rejects.toThrow('signer unavailable');
   });
 });

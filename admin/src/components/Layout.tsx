@@ -1,3 +1,4 @@
+import { FormEvent, useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -14,31 +15,95 @@ import {
   LogOut,
   Ticket,
   Activity,
+  UserRoundCog,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import {
+  ADMIN_STEP_UP_EVENT,
+  authApi,
+  type AdminStepUpEventDetail,
+} from '../api/client';
+import type { AdminUser } from '../types';
 
-const navigationItems = [
+const navigationItems: Array<{ path: string; label: string; icon: typeof LayoutDashboard; roles?: AdminUser['role'][] }> = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/create-poll', label: 'Create Poll', icon: PlusCircle },
+  { path: '/create-poll', label: 'Create Poll', icon: PlusCircle, roles: ['superadmin', 'admin'] },
   { path: '/drafts', label: 'Drafts', icon: FileText },
   { path: '/active', label: 'Active Polls', icon: CheckCircle },
   { path: '/history', label: 'History', icon: History },
   { path: '/insights', label: 'Insights', icon: BarChart3 },
   { path: '/messages', label: 'Messages', icon: MessageSquare },
   { path: '/tickets', label: 'Support', icon: Ticket },
-  { path: '/profiles', label: 'Profiles', icon: Users },
-  { path: '/logs', label: 'Logs', icon: Activity },
+  { path: '/profiles', label: 'Profiles', icon: Users, roles: ['superadmin', 'admin'] },
+  { path: '/logs', label: 'Logs', icon: Activity, roles: ['superadmin', 'observer'] },
   { path: '/shield', label: 'Shield', icon: Shield },
-  { path: '/settings/regions', label: 'Settings', icon: Settings },
+  { path: '/admin-users', label: 'Admin Accounts', icon: UserRoundCog, roles: ['superadmin'] },
+  { path: '/settings/regions', label: 'Settings', icon: Settings, roles: ['superadmin', 'admin'] },
 ];
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [stepUpRequest, setStepUpRequest] = useState<AdminStepUpEventDetail | null>(null);
+  const [stepUpPassword, setStepUpPassword] = useState('');
+  const [stepUpTotp, setStepUpTotp] = useState('');
+  const [stepUpError, setStepUpError] = useState('');
+  const [stepUpLoading, setStepUpLoading] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    navigate('/login');
+  useEffect(() => {
+    const handleStepUpRequired = (event: Event) => {
+      const detail = (event as CustomEvent<AdminStepUpEventDetail>).detail;
+      setStepUpError('');
+      setStepUpPassword('');
+      setStepUpTotp('');
+      setStepUpRequest(detail);
+    };
+    window.addEventListener(ADMIN_STEP_UP_EVENT, handleStepUpRequired);
+    return () => window.removeEventListener(ADMIN_STEP_UP_EVENT, handleStepUpRequired);
+  }, []);
+
+  const storedUser = sessionStorage.getItem('admin_user');
+  let adminUser: AdminUser | null = null;
+  try { adminUser = storedUser ? JSON.parse(storedUser) : null; } catch { adminUser = null; }
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      sessionStorage.removeItem('admin_csrf');
+      sessionStorage.removeItem('admin_user');
+      navigate('/login');
+      window.location.reload();
+    }
+  };
+
+  const submitStepUp = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!stepUpRequest || !stepUpPassword) return;
+    setStepUpLoading(true);
+    setStepUpError('');
+    try {
+      await authApi.stepUp(stepUpPassword, stepUpTotp);
+      const request = stepUpRequest;
+      setStepUpRequest(null);
+      setStepUpPassword('');
+      setStepUpTotp('');
+      request.resolve();
+    } catch (error: any) {
+      setStepUpError(
+        error.response?.data?.error?.message || 'Re-authentication failed'
+      );
+    } finally {
+      setStepUpLoading(false);
+    }
+  };
+
+  const cancelStepUp = () => {
+    stepUpRequest?.reject(new Error('Administrator cancelled re-authentication'));
+    setStepUpRequest(null);
+    setStepUpPassword('');
+    setStepUpTotp('');
+    setStepUpError('');
   };
 
   const getBreadcrumbs = () => {
@@ -61,7 +126,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navigationItems.map((item) => {
+          {navigationItems.filter(item => !item.roles || (adminUser && item.roles.includes(adminUser.role))).map((item) => {
             const Icon = item.icon;
             const isActive =
               location.pathname === item.path ||
@@ -89,11 +154,11 @@ export default function Layout() {
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-semibold text-primary-700">A</span>
+                <span className="text-sm font-semibold text-primary-700">{adminUser?.email?.[0]?.toUpperCase() || 'A'}</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">Admin User</p>
-                <p className="text-xs text-gray-500">admin@DTG.ge</p>
+                <p className="text-sm font-medium text-gray-700">{adminUser?.fullName || adminUser?.role || 'Admin'}</p>
+                <p className="text-xs text-gray-500">{adminUser?.email || ''}</p>
               </div>
             </div>
             <button
@@ -136,7 +201,71 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {stepUpRequest && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="step-up-title"
+        >
+          <form onSubmit={submitStepUp} className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h2 id="step-up-title" className="text-lg font-semibold text-gray-900">
+              Confirm sensitive operation
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Re-enter your password and authenticator code. Approval remains valid for five minutes.
+            </p>
+            {stepUpError && (
+              <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{stepUpError}</div>
+            )}
+            <label className="mt-5 block text-sm font-medium text-gray-700" htmlFor="step-up-password">
+              Password
+            </label>
+            <input
+              id="step-up-password"
+              type="password"
+              autoComplete="current-password"
+              autoFocus
+              required
+              value={stepUpPassword}
+              onChange={event => setStepUpPassword(event.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+            />
+            <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="step-up-totp">
+              Authenticator code
+            </label>
+            <input
+              id="step-up-totp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              value={stepUpTotp}
+              onChange={event => setStepUpTotp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono tracking-widest shadow-sm"
+            />
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={cancelStepUp}
+                disabled={stepUpLoading}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={stepUpLoading || !stepUpPassword}
+                className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {stepUpLoading ? 'Verifying…' : 'Confirm and continue'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
-

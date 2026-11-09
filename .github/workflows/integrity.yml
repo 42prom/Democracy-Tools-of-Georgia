@@ -10,7 +10,10 @@ on:
     - cron: "0 2 * * *"
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
+
+permissions:
+  contents: read
 
 jobs:
   # ────────────────────────────────────────────────
@@ -23,17 +26,17 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run security audit (audit-ci)
-        run: npx audit-ci --config .audit-ci.json
+        run: npx --no-install audit-ci --config .audit-ci.json
 
   # ────────────────────────────────────────────────
   # Job 2: Admin Security Audit
@@ -45,15 +48,15 @@ jobs:
       run:
         working-directory: admin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: admin/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run npm audit (high severity)
         run: npm audit --audit-level=high
 
@@ -76,15 +79,15 @@ jobs:
       RECEIPT_PUBLIC_KEY_PEM: ""
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run crypto-related tests
         run: npx jest tests/nullifier.test.ts tests/merkle.test.ts tests/receipt.test.ts tests/vote-protocol.test.ts --forceExit
 
@@ -98,15 +101,15 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run TypeScript type check
         run: npx tsc --noEmit
 
@@ -120,7 +123,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
         env:
           POSTGRES_USER: dtg_user
           POSTGRES_PASSWORD: dtg_ci_password
@@ -136,15 +139,15 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run database migrations
         env:
           DATABASE_URL: postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci
@@ -166,10 +169,11 @@ jobs:
     name: Flutter Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
+          flutter-version: "3.44.0"
           channel: stable
           cache: true
       - name: Install Flutter dependencies
@@ -189,9 +193,9 @@ jobs:
     name: Audit Shield
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - name: Install pip-audit

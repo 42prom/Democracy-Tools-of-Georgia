@@ -6,6 +6,7 @@ import { AudienceRules } from '../../types/polls';
 import { createError } from '../../middleware/errorHandler';
 import { pool } from '../../db/client';
 import { AppConfig } from '../../config/app';
+import { validateAudienceRules, validatePollPayload, validateUuid } from '../../services/pollValidation';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = validateUuid(req.params.id, 'poll id');
 
     const result = await pool.query('SELECT * FROM polls WHERE id = $1', [id]);
 
@@ -125,8 +126,8 @@ router.post(
   '/',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log(`[AdminRoute] POST / body:`, req.body);
       const pollData = req.body;
+      validatePollPayload(pollData);
 
       // Validation
       if (!pollData.title) {
@@ -181,6 +182,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rules: AudienceRules = req.body.rules || {};
+      validateAudienceRules(rules);
 
       const estimate = await estimateAudience(rules);
 
@@ -197,8 +199,9 @@ router.post(
  */
 router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = validateUuid(req.params.id, 'poll id');
     const updates = req.body;
+    validatePollPayload(updates, true);
 
     const poll = await updatePoll(String(id), updates);
 
@@ -215,12 +218,17 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
  */
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = validateUuid(req.params.id, 'poll id');
 
-    const result = await pool.query('DELETE FROM polls WHERE id = $1 RETURNING *', [id]);
+    const result = await pool.query(
+      "DELETE FROM polls WHERE id = $1 AND status = 'draft' RETURNING *",
+      [id]
+    );
 
     if (result.rows.length === 0) {
-      throw createError('Poll not found', 404);
+      const existing = await pool.query('SELECT status FROM polls WHERE id = $1', [id]);
+      if (existing.rows.length === 0) throw createError('Poll not found', 404);
+      throw createError('Only draft polls can be deleted', 409);
     }
 
     res.json({ message: 'Poll deleted successfully' });
@@ -237,7 +245,7 @@ router.patch(
   '/:id/publish',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = validateUuid(req.params.id, 'poll id');
 
       const poll = await publishPoll(String(id));
 
@@ -257,7 +265,7 @@ router.get(
   '/:id/survey-results',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = validateUuid(req.params.id, 'poll id');
       const K_THRESHOLD = AppConfig.MIN_K_ANONYMITY;
 
       // Verify poll exists and is a survey
@@ -468,7 +476,7 @@ router.get(
   '/:id/results',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = validateUuid(req.params.id, 'poll id');
 
       // Verify poll exists
       const pollResult = await pool.query('SELECT * FROM polls WHERE id = $1', [id]);

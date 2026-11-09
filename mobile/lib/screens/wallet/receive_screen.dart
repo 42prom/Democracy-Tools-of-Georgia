@@ -37,16 +37,15 @@ class ReceiveScreen extends StatelessWidget {
                   Text(
                     loc.translate('receive_dtg'),
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     loc.translate('share_qr_wallet'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: Colors.grey),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
@@ -85,9 +84,7 @@ class ReceiveScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   loc.translate('wallet_address'),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: Colors.grey),
                                 ),
                                 const SizedBox(height: 6),
@@ -116,7 +113,8 @@ class ReceiveScreen extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Clipboard.setData(
-                                ClipboardData(text: walletAddress));
+                              ClipboardData(text: walletAddress),
+                            );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(loc.translate('address_copied')),
@@ -134,7 +132,8 @@ class ReceiveScreen extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: BorderSide(
-                                color: Theme.of(context).primaryColor),
+                              color: Theme.of(context).primaryColor,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

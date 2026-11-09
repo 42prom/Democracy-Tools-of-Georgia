@@ -1,46 +1,76 @@
-version: "3.8"
+# DTG Docker Compose reference only.
+# This file is not a production deployment: production still requires an
+# orchestrator/secrets manager, TLS edge, immutable image digests, backups,
+# monitoring, and an independently reviewed release manifest.
 
-# DTG Docker Compose Example
-# Use this template for secure production or development deployments.
-# Secrets should be provided via a .env file (see .env.example).
+name: ${DTG_PRODUCTION_PROJECT_NAME:-dtg-voting-production}
 
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: dtg-postgres-prod
+    image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
     environment:
       POSTGRES_DB: ${DB_NAME:-dtg}
       POSTGRES_USER: ${DB_USER:-dtg_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
 
   redis:
-    image: redis:7-alpine
-    container_name: dtg-redis-prod
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     restart: always
 
   backend:
     image: ${BACKEND_IMAGE:-dtg-backend:latest}
-    container_name: dtg-backend-prod
     environment:
       - NODE_ENV=production
+      - DEPLOYMENT_ENV=production
       - PORT=${PORT:-3000}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=${JWT_SECRET}
-      - PN_HASH_SECRET=${PN_HASH_SECRET}
-      - API_KEY_ENCRYPTION_SECRET=${API_KEY_ENCRYPTION_SECRET}
-      - DEVICE_HASH_SECRET=${DEVICE_HASH_SECRET}
-      - VOTER_HASH_SECRET=${VOTER_HASH_SECRET}
+      - REQUIRE_DEVICE_ATTESTATION=true
+      - ENFORCE_RESTRICTED_DB_ROLE=true
+      - VAULT_REQUIRED=true
+      - VAULT_ADDR=${VAULT_ADDR:?VAULT_ADDR is required}
+      - VAULT_TOKEN_FILE=/run/secrets/vault-token
+      - VAULT_SECRET_PATH=${VAULT_SECRET_PATH:-secret/data/dtg}
+      - ALLOW_DEVELOPMENT_ATTESTATION_BYPASS=false
+      - ANDROID_PACKAGE_NAME=${ANDROID_PACKAGE_NAME:-messaging.dtg}
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-}
+      - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      - APPLE_APP_ID_PREFIX=${APPLE_APP_ID_PREFIX:?APPLE_APP_ID_PREFIX is required}
+      - APPLE_BUNDLE_ID=${APPLE_BUNDLE_ID:-ge.dtfg.mobile}
+      - APPLE_APP_ATTEST_ENVIRONMENT=production
+      - APPLE_APP_ATTEST_REQUIRE_EXTENSIONS=true
+      - APPLE_APP_ATTEST_ALLOWED_CATEGORIES=${APPLE_APP_ATTEST_ALLOWED_CATEGORIES:-2,4}
+      - APPLE_APP_BUNDLE_VERSION=${APPLE_APP_BUNDLE_VERSION:?APPLE_APP_BUNDLE_VERSION is required}
+      - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN is required}
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:?TRUST_PROXY_HOPS is required}
+      - MIN_K_ANONYMITY=${MIN_K_ANONYMITY:-30}
+      - ALLOW_MOCK_LOGIN=false
+      - BYPASS_ADMIN_AUTH=false
+      - ENABLE_DEBUG_LOGGING=false
       - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
+      - REWARD_PROCESSOR_ENABLED=${REWARD_PROCESSOR_ENABLED:?REWARD_PROCESSOR_ENABLED must be true or false}
+      - POLL_STATUS_MONITOR_ENABLED=${POLL_STATUS_MONITOR_ENABLED:?POLL_STATUS_MONITOR_ENABLED must be true or false}
+      - VOTE_ANCHOR_ENABLED=${VOTE_ANCHOR_ENABLED:?VOTE_ANCHOR_ENABLED must be true or false}
+      - AUDIT_CHECKPOINT_ENABLED=true
+      - AUDIT_CHECKPOINT_URL=${AUDIT_CHECKPOINT_URL:?AUDIT_CHECKPOINT_URL is required}
+      - AUDIT_CHECKPOINT_ALLOWED_HOSTS=${AUDIT_CHECKPOINT_ALLOWED_HOSTS:?AUDIT_CHECKPOINT_ALLOWED_HOSTS is required}
+      - AUDIT_CHECKPOINT_DEPLOYMENT_ID=${AUDIT_CHECKPOINT_DEPLOYMENT_ID:?AUDIT_CHECKPOINT_DEPLOYMENT_ID is required}
+      - AUDIT_CHECKPOINT_INTERVAL_SECONDS=${AUDIT_CHECKPOINT_INTERVAL_SECONDS:-300}
+      - AUDIT_CHECKPOINT_PUBLIC_KEY_PEM=${AUDIT_CHECKPOINT_PUBLIC_KEY_PEM:?AUDIT_CHECKPOINT_PUBLIC_KEY_PEM is required}
+    volumes:
+      - type: bind
+        source: ${VAULT_TOKEN_HOST_FILE:?VAULT_TOKEN_HOST_FILE is required}
+        target: /run/secrets/vault-token
+        read_only: true
     depends_on:
       - postgres
       - redis

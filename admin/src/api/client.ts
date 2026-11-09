@@ -19,7 +19,9 @@ import type {
   CreateMessageRequest,
   LoginRequest,
   AuthResponse,
+  AdminAccount,
   AdminUser,
+  AdminMfaProvisioning,
 } from '../types';
 
 // TASK-P2-ADM-01: Configurable API base URL
@@ -32,6 +34,38 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL
 const MAX_RETRIES = parseInt(import.meta.env.VITE_API_MAX_RETRIES || '3', 10);
 const RETRY_DELAY_MS = parseInt(import.meta.env.VITE_API_RETRY_DELAY || '1000', 10);
 const API_TIMEOUT_MS = parseInt(import.meta.env.VITE_API_TIMEOUT || '15000', 10);
+export const ADMIN_STEP_UP_EVENT = 'dtg-admin-step-up-required';
+
+export interface AdminStepUpEventDetail {
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
+let pendingStepUp: Promise<void> | null = null;
+
+function requestAdminStepUp(): Promise<void> {
+  if (pendingStepUp) return pendingStepUp;
+  pendingStepUp = new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error('Administrator re-authentication timed out')),
+      120_000
+    );
+    const detail: AdminStepUpEventDetail = {
+      resolve: () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      reject: reason => {
+        window.clearTimeout(timeout);
+        reject(reason);
+      },
+    };
+    window.dispatchEvent(new CustomEvent<AdminStepUpEventDetail>(ADMIN_STEP_UP_EVENT, { detail }));
+  }).finally(() => {
+    pendingStepUp = null;
+  });
+  return pendingStepUp;
+}
 
 // HTTP status codes that are safe to retry
 const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
@@ -43,16 +77,47 @@ const RETRYABLE_ERROR_CODES = ['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONN
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: API_TIMEOUT_MS,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Admin authentication
+export async function adminFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.delete('Authorization');
+  const method = (init.method || 'GET').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrfToken = sessionStorage.getItem('admin_csrf');
+    if (csrfToken) headers.set('X-Admin-CSRF', csrfToken);
+  }
+  if (typeof init.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  let response = await fetch(input, { ...init, headers, credentials: 'include' });
+  if (response.status === 428) {
+    const payload = await response.clone().json().catch(() => null) as { error?: { code?: string } } | null;
+    if (payload?.error?.code === 'ADMIN_STEP_UP_REQUIRED') {
+      await requestAdminStepUp();
+      response = await fetch(input, { ...init, headers, credentials: 'include' });
+    }
+  }
+  if (response.status === 401) {
+    sessionStorage.removeItem('admin_csrf');
+    sessionStorage.removeItem('admin_user');
+    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+  }
+  return response;
+}
+
+// Admin authentication uses an opaque HttpOnly cookie. JavaScript only holds
+// the CSRF proof, which is not sufficient to authenticate on its own.
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const method = (config.method || 'get').toLowerCase();
+  if (!['get', 'head', 'options'].includes(method)) {
+    const csrfToken = sessionStorage.getItem('admin_csrf');
+    if (csrfToken) config.headers['X-Admin-CSRF'] = csrfToken;
   }
   // Initialize retry count
   (config as any).__retryCount = (config as any).__retryCount || 0;
@@ -77,7 +142,9 @@ function isRetryableError(error: AxiosError): boolean {
  * Determine if a request method is safe to retry (idempotent)
  */
 function isIdempotentMethod(method: string | undefined): boolean {
-  const idempotent = ['get', 'head', 'options', 'put', 'delete'];
+  // Admin mutations are never retried automatically, even if HTTP defines a
+  // method as idempotent: downstream side effects may not be replay-safe.
+  const idempotent = ['get', 'head', 'options'];
   return idempotent.includes((method || '').toLowerCase());
 }
 
@@ -96,13 +163,27 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const config = error.config as InternalAxiosRequestConfig & { __retryCount?: number };
+    const config = error.config as InternalAxiosRequestConfig & {
+      __retryCount?: number;
+      __stepUpRetried?: boolean;
+    };
 
     if (!config) {
       return Promise.reject(error);
     }
 
     const retryCount = config.__retryCount || 0;
+    const responseError = error.response?.data as { error?: { code?: string } } | undefined;
+
+    if (
+      error.response?.status === 428 &&
+      responseError?.error?.code === 'ADMIN_STEP_UP_REQUIRED' &&
+      !config.__stepUpRetried
+    ) {
+      config.__stepUpRetried = true;
+      await requestAdminStepUp();
+      return apiClient.request(config);
+    }
 
     // Only retry GET requests (idempotent) and retryable errors
     if (
@@ -121,12 +202,13 @@ apiClient.interceptors.response.use(
     console.error('[API Error]', error.response?.status || 'NETWORK', config.url, error.message);
 
     // Auto-logout on authentication failures (stale/expired token)
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      const isAuthEndpoint = config.url?.includes('/admin/auth/login');
+    if (error.response?.status === 401) {
+      const isAuthEndpoint = config.url?.includes('/admin/auth/login') ||
+        config.url?.includes('/admin/auth/step-up');
       if (!isAuthEndpoint) {
         console.warn('[API] Authentication failed — clearing session and redirecting to login.');
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
+        sessionStorage.removeItem('admin_csrf');
+        sessionStorage.removeItem('admin_user');
         // Redirect to login without full page reload loop
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
@@ -376,7 +458,6 @@ export type AdminSettings = {
     enabledPolls: boolean;
     enabledMessages: boolean;
     serviceAccountJson: string;
-    serviceAccountPath: string;
   };
 };
 
@@ -393,8 +474,8 @@ export const settingsApi = {
     const response = await apiClient.post('/admin/settings/blockchain/test', { rpcUrl });
     return response.data;
   },
-  testNotificationsConnection: async (serviceAccountJson: string, serviceAccountPath: string): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.post('/admin/settings/notifications/test', { serviceAccountJson, serviceAccountPath });
+  testNotificationsConnection: async (serviceAccountJson: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post('/admin/settings/notifications/test', { serviceAccountJson });
     return response.data;
   },
 };
@@ -404,10 +485,78 @@ export const authApi = {
     const response = await apiClient.post('/admin/auth/login', credentials);
     return response.data;
   },
-  me: async (): Promise<AdminUser> => {
+  me: async (): Promise<AuthResponse> => {
     const response = await apiClient.get('/admin/auth/me');
     return response.data;
-  }
+  },
+  logout: async (): Promise<void> => {
+    await apiClient.post('/admin/auth/logout');
+  },
+  stepUp: async (password: string, totpCode: string): Promise<{ expiresAt: string }> => {
+    const response = await apiClient.post('/admin/auth/step-up', { password, totpCode });
+    return response.data;
+  },
+};
+
+export interface AdminAuditEntry {
+  id: number;
+  eventType: string;
+  payload: Record<string, unknown>;
+  previousHash: string;
+  rowHash: string;
+  createdAt: string;
+}
+
+export interface AdminAuditVerification {
+  valid: boolean;
+  entries: number;
+  brokenAt: number | null;
+  headHash: string;
+  verifiedAt: string;
+}
+
+export const adminAuditApi = {
+  list: async (limit = 50): Promise<{ entries: AdminAuditEntry[]; total: number }> => {
+    const response = await apiClient.get('/admin/audit', { params: { limit } });
+    return response.data;
+  },
+  verify: async (): Promise<AdminAuditVerification> => {
+    const response = await apiClient.get('/admin/audit/verify');
+    return response.data;
+  },
+};
+
+export const adminUsersApi = {
+  list: async (): Promise<AdminAccount[]> => {
+    const response = await apiClient.get('/admin/users');
+    return response.data.users;
+  },
+  create: async (data: {
+    email: string;
+    fullName?: string;
+    role: AdminUser['role'];
+    password: string;
+  }): Promise<AdminAccount & AdminMfaProvisioning> => {
+    const response = await apiClient.post('/admin/users', data);
+    return response.data;
+  },
+  update: async (
+    id: string,
+    data: { role?: AdminUser['role']; isActive?: boolean; fullName?: string }
+  ): Promise<AdminAccount> => {
+    const response = await apiClient.patch(`/admin/users/${id}`, data);
+    return response.data;
+  },
+  revokeSessions: async (id: string): Promise<void> => {
+    await apiClient.post(`/admin/users/${id}/revoke-sessions`);
+  },
+  resetPassword: async (id: string, password: string): Promise<void> => {
+    await apiClient.post(`/admin/users/${id}/reset-password`, { password });
+  },
+  resetMfa: async (id: string): Promise<AdminMfaProvisioning> => {
+    const response = await apiClient.post(`/admin/users/${id}/reset-mfa`);
+    return response.data;
+  },
 };
 
 // Tickets API
@@ -525,14 +674,11 @@ export const auditExportApi = {
       params.append('dateRangeEnd', options.dateRangeEnd);
     }
 
-    const token = localStorage.getItem('admin_token');
     const url = `${apiClient.defaults.baseURL}/admin/export/polls/${pollId}/audit.csv?${params.toString()}`;
 
     // Use fetch for blob download
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {
@@ -580,13 +726,10 @@ export const auditExportApi = {
       params.append('dateRangeEnd', options.dateRangeEnd);
     }
 
-    const token = localStorage.getItem('admin_token');
     const url = `${apiClient.defaults.baseURL}/admin/export/polls/${pollId}/audit-stream.csv?${params.toString()}`;
 
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {

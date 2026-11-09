@@ -3,6 +3,7 @@ import {
   Globe, Shield, ShieldOff, Plus, Trash2, Search,
   AlertCircle, CheckCircle, Loader2, RefreshCw, MapPin, Ban, CheckCircle2, XCircle
 } from 'lucide-react';
+import { adminFetch } from '../api/client';
 
 // Country list (ISO 3166-1 alpha-2)
 const ALL_COUNTRIES = [
@@ -219,8 +220,6 @@ export default function SettingsGeoBlocking() {
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testLoading, setTestLoading] = useState(false);
 
-  const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
-
   useEffect(() => {
     loadAll();
   }, []);
@@ -230,15 +229,15 @@ export default function SettingsGeoBlocking() {
     setError(null);
 
     try {
-      const headers = { 'Authorization': `Bearer ${token}` };
+      const headers = {};
 
       const [settingsRes, countriesRes, ipsRes, whitelistRes, logsRes, statsRes] = await Promise.all([
-        fetch('/api/v1/admin/geo-blocking/settings', { headers }),
-        fetch('/api/v1/admin/geo-blocking/countries', { headers }),
-        fetch('/api/v1/admin/geo-blocking/blocked-ips', { headers }),
-        fetch('/api/v1/admin/geo-blocking/whitelist', { headers }),
-        fetch('/api/v1/admin/geo-blocking/logs?limit=50', { headers }),
-        fetch('/api/v1/admin/geo-blocking/stats', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/settings', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/countries', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/blocked-ips', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/whitelist', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/logs?limit=50', { headers }),
+        adminFetch('/api/v1/admin/geo-blocking/stats', { headers }),
       ]);
 
       if (settingsRes.ok) setSettings(await settingsRes.json());
@@ -259,11 +258,10 @@ export default function SettingsGeoBlocking() {
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/admin/geo-blocking/settings', {
+      const response = await adminFetch('/api/v1/admin/geo-blocking/settings', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(updates),
       });
@@ -285,11 +283,10 @@ export default function SettingsGeoBlocking() {
     if (!newCountry.code) return;
 
     try {
-      const response = await fetch('/api/v1/admin/geo-blocking/countries', {
+      const response = await adminFetch('/api/v1/admin/geo-blocking/countries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           country_code: newCountry.code,
@@ -309,9 +306,8 @@ export default function SettingsGeoBlocking() {
 
   async function unblockCountry(code: string) {
     try {
-      await fetch(`/api/v1/admin/geo-blocking/countries/${code}`, {
+      await adminFetch(`/api/v1/admin/geo-blocking/countries/${code}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
     } catch (err: unknown) {
@@ -323,11 +319,10 @@ export default function SettingsGeoBlocking() {
     if (!newIP.ip) return;
 
     try {
-      const response = await fetch('/api/v1/admin/geo-blocking/blocked-ips', {
+      const response = await adminFetch('/api/v1/admin/geo-blocking/blocked-ips', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           ip_address: newIP.ip,
@@ -347,9 +342,8 @@ export default function SettingsGeoBlocking() {
 
   async function unblockIP(ip: string) {
     try {
-      await fetch(`/api/v1/admin/geo-blocking/blocked-ips/${encodeURIComponent(ip)}`, {
+      await adminFetch(`/api/v1/admin/geo-blocking/blocked-ips/${encodeURIComponent(ip)}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
     } catch (err: unknown) {
@@ -361,11 +355,10 @@ export default function SettingsGeoBlocking() {
     if (!newWhitelist.ip) return;
 
     try {
-      const response = await fetch('/api/v1/admin/geo-blocking/whitelist', {
+      const response = await adminFetch('/api/v1/admin/geo-blocking/whitelist', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           ip_address: newWhitelist.ip,
@@ -384,9 +377,8 @@ export default function SettingsGeoBlocking() {
 
   async function removeFromWhitelist(ip: string) {
     try {
-      await fetch(`/api/v1/admin/geo-blocking/whitelist/${encodeURIComponent(ip)}`, {
+      await adminFetch(`/api/v1/admin/geo-blocking/whitelist/${encodeURIComponent(ip)}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
       });
       loadAll();
     } catch (err: unknown) {
@@ -401,11 +393,10 @@ export default function SettingsGeoBlocking() {
     setTestResult(null);
 
     try {
-      const response = await fetch('/api/v1/admin/geo-blocking/test', {
+      const response = await adminFetch('/api/v1/admin/geo-blocking/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ ip_address: testIP }),
       });

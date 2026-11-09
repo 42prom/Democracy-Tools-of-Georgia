@@ -4,7 +4,6 @@ import { pool } from '../db/client';
 import { getJwtSecret } from '../config/jwt';
 import { getPnHashSecret } from '../config/secrets';
 
-const PN_HASH_SECRET = getPnHashSecret();
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
@@ -15,7 +14,7 @@ const LOCKOUT_DURATION_MINUTES = 15;
 export function computePnHash(pnDigits: string): string {
   const input = `GE:${pnDigits}`;
   return crypto
-    .createHmac('sha256', PN_HASH_SECRET)
+    .createHmac('sha256', getPnHashSecret())
     .update(input)
     .digest('hex');
 }
