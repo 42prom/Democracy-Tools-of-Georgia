@@ -3,6 +3,6 @@ uvicorn==0.52.4
 redis==8.1.0
 httpx==0.28.1
 pydantic==2.13.5
-pydantic-settings==2.15.0
+pydantic-settings==2.16.2
 python-dotenv==1.2.3
 starlette==1.6.0
