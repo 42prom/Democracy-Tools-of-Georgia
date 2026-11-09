@@ -6,13 +6,23 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
+    id("com.google.gms.google-services") apply false
 }
 
 val releaseKeystoreProperties = Properties()
 val releaseKeystorePropertiesFile = rootProject.file("key.properties")
 val releaseTaskRequested = gradle.startParameter.taskNames.any {
     it.contains("release", ignoreCase = true)
+}
+// Push notifications are optional during local/debug integration tests. Release
+// builds must still provide their real Firebase configuration.
+val googleServicesConfigured = file("google-services.json").exists() ||
+    file("src/debug/google-services.json").exists() ||
+    file("src/release/google-services.json").exists()
+if (googleServicesConfigured) {
+    apply(plugin = "com.google.gms.google-services")
+} else if (releaseTaskRequested) {
+    throw GradleException("Release builds require the production google-services.json configuration.")
 }
 val playIntegrityCloudProjectNumber = providers
     .gradleProperty("PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
