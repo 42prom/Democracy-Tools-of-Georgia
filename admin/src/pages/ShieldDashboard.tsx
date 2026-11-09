@@ -12,13 +12,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import Card from '../components/ui/Card';
+import { adminFetch } from '../api/client';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
-
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken') ?? '';
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-}
 
 interface RiskEntry { ip: string; score: number }
 interface RateLimitHotspot { key: string; count: number }
@@ -65,7 +61,7 @@ export default function ShieldDashboard() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/admin/shield/status`, { headers: getAuthHeaders() });
+      const res = await adminFetch(`${API_BASE}/api/v1/admin/shield/status`);
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       const data: ShieldStatus = await res.json();
       setStatus(data);
@@ -88,9 +84,9 @@ export default function ShieldDashboard() {
     setIpLogLoading(true);
     setIpLog(null);
     try {
-      const res = await fetch(
+      const res = await adminFetch(
         `${API_BASE}/api/v1/admin/shield/logs/${encodeURIComponent(ip)}`,
-        { headers: getAuthHeaders() }
+        {}
       );
       const data: IpLog = await res.json();
       setIpLog(data);
@@ -104,9 +100,9 @@ export default function ShieldDashboard() {
   const handleUnblock = async (ip: string) => {
     setActionMsg(null);
     try {
-      const res = await fetch(
+      const res = await adminFetch(
         `${API_BASE}/api/v1/admin/shield/block/${encodeURIComponent(ip)}`,
-        { method: 'DELETE', headers: getAuthHeaders() }
+        { method: 'DELETE' }
       );
       const d = await res.json();
       setActionMsg({ text: d.message ?? 'Unblocked successfully', ok: true });
@@ -124,9 +120,9 @@ export default function ShieldDashboard() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/v1/admin/shield/block`, {
+      const res = await adminFetch(`${API_BASE}/api/v1/admin/shield/block`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip: manualIp, reason: manualReason, durationSec: 3600 }),
       });
       const d = await res.json();

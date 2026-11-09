@@ -9,6 +9,7 @@ Heuristically analyzes and proxies traffic safely.
 
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from ipaddress import ip_address, ip_network
 import httpx
 import uvicorn
 import time
@@ -23,6 +24,53 @@ risk_engine = RiskEngine()
 # Initialize HTTP client for proxying
 client = httpx.AsyncClient(base_url=config.BACKEND_URL, timeout=30.0)
 
+
+def resolve_client_ip(request: Request, trusted_proxy_cidrs: str | None = None) -> str:
+    """Resolve client IP while rejecting caller-forged forwarding headers."""
+    peer = request.client.host if request.client else "unknown"
+    try:
+        peer_address = ip_address(peer)
+    except ValueError:
+        return peer
+
+    raw_cidrs = config.TRUSTED_PROXY_CIDRS if trusted_proxy_cidrs is None else trusted_proxy_cidrs
+    try:
+        trusted_networks = tuple(
+            ip_network(value.strip(), strict=False)
+            for value in raw_cidrs.split(",")
+            if value.strip()
+        )
+    except ValueError:
+        return str(peer_address)
+
+    def is_trusted(address) -> bool:
+        return any(address in network for network in trusted_networks)
+
+    if not trusted_networks or not is_trusted(peer_address):
+        return str(peer_address)
+
+    cloudflare_address = request.headers.get("cf-connecting-ip", "").strip()
+    if cloudflare_address:
+        try:
+            return str(ip_address(cloudflare_address))
+        except ValueError:
+            return str(peer_address)
+
+    forwarded_chain = request.headers.get("x-forwarded-for", "")
+    if forwarded_chain:
+        try:
+            addresses = [ip_address(value.strip()) for value in forwarded_chain.split(",")]
+        except ValueError:
+            return str(peer_address)
+
+        for address in reversed(addresses):
+            if not is_trusted(address):
+                return str(address)
+        if addresses:
+            return str(addresses[0])
+
+    return str(peer_address)
+
 @app.on_event("startup")
 async def startup_event():
     print(f"Starting Shield Service on port {config.PORT}")
@@ -36,26 +84,7 @@ async def shutdown_event():
 
 @app.middleware("http")
 async def shield_middleware(request: Request, call_next):
-    # 1. Get Client IP — prefer CF-Connecting-IP (Cloudflare sets this and
-    #    strips any client-forged version), then fall back to X-Forwarded-For,
-    #    then the raw TCP socket address.
-    client_ip = (
-        request.headers.get("cf-connecting-ip")
-        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        or request.client.host
-    )
-
-    # ── ADMIN BYPASS ────────────────────────────────────────────────────────
-    # Authenticated admin routes and the admin login endpoint bypass all
-    # Shield risk/geo/VPN checks. The backend's requireAdmin middleware still
-    # enforces valid JWT authentication, so there is no security gap.
-    ADMIN_PATHS = ["/api/v1/admin/"]
-    is_admin_path = any(request.url.path.startswith(p) for p in ADMIN_PATHS)
-    if is_admin_path:
-        response = await call_next(request)
-        response.headers["X-Shield-Bypass"] = "admin"
-        return response
-    # ── END ADMIN BYPASS ─────────────────────────────────────────────────────
+    client_ip = resolve_client_ip(request)
 
     # 2. Heuristic Analysis - Check if blocked by Shield Risk Engine
     start_time = time.time()
@@ -105,9 +134,14 @@ async def proxy(request: Request, path: str):
     url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
     
     # Filter headers
-    excluded_headers = ["host", "content-length"]
+    excluded_headers = {
+        "host", "content-length", "connection", "keep-alive", "proxy-authenticate",
+        "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade",
+        "forwarded", "x-forwarded-for", "x-forwarded-proto", "cf-connecting-ip",
+    }
     headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
-    headers["x-forwarded-for"] = request.client.host
+    headers["x-forwarded-for"] = resolve_client_ip(request)
+    headers["x-forwarded-proto"] = request.url.scheme
     # Force uncompressed responses: the shield cannot re-encode compressed bodies,
     # so we tell the backend to send plain text to avoid zstd/gzip decode issues.
     headers["accept-encoding"] = "identity"
@@ -131,9 +165,18 @@ async def proxy(request: Request, path: str):
             async for chunk in target_resp.aiter_bytes():
                 yield chunk
                 
-        # Filter response headers — keep content-encoding so browser can decompress if needed
-        # Only strip transfer-encoding and content-length (recomputed by StreamingResponse)
-        resp_headers = {k: v for k, v in target_resp.headers.items() if k.lower() not in ["content-length", "transfer-encoding"]}
+        # Hop-by-hop headers belong to the backend connection and must never be
+        # forwarded across the gateway boundary. StreamingResponse recomputes
+        # framing for the client connection.
+        response_excluded_headers = {
+            "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+            "te", "trailer", "transfer-encoding", "upgrade", "content-length",
+        }
+        resp_headers = {
+            key: value
+            for key, value in target_resp.headers.items()
+            if key.lower() not in response_excluded_headers
+        }
                 
         return StreamingResponse(
             stream_response(),

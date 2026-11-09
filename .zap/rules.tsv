@@ -1,0 +1,13 @@
+# ZAP passive scanner rule configuration for the isolated admin-image baseline.
+# Rule ID<TAB>ACTION<TAB>COMMENT
+10020	FAIL	Missing anti-clickjacking header
+10021	FAIL	Missing X-Content-Type-Options header
+10023	FAIL	Information disclosure in debug/error response
+10035	FAIL	Missing or invalid HSTS policy
+10038	FAIL	Missing or unsafe Content-Security-Policy
+# Rule 10049 describes both cacheable and non-storable responses; it is metadata.
+# The DAST job separately asserts the live response's no-store policy.
+10049	INFO	Cacheability metadata; authenticated admin content must remain no-store
+10055	FAIL	CSP contains a wildcard directive
+# SPA detection describes this dashboard's architecture; it is not a vulnerability.
+10109	INFO	Modern Web Application detection retained in the report

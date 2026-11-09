@@ -545,8 +545,8 @@ class LocalizationService extends ChangeNotifier {
     'failed_submit_survey': 'Failed to submit survey',
     'requesting_challenge': 'Requesting challenge...',
     'step_1_4_challenge': 'Step 1/4: Requesting challenge nonce...',
-    'step_2_4_attestation': 'Step 2/4: Issuing attestation...',
-    'step_3_4_nullifier': 'Step 3/4: Computing nullifier...',
+    'step_2_4_response_binding': 'Step 2/4: Sealing survey responses...',
+    'step_3_4_attestation': 'Step 3/4: Issuing device attestation...',
     'step_4_4_submitting': 'Step 4/4: Submitting survey...',
 
     // Confirm Vote
@@ -555,7 +555,7 @@ class LocalizationService extends ChangeNotifier {
     'step_1_5_challenge': 'Step 1/5: Requesting challenge nonce...',
     'step_2_5_biometric': 'Step 2/5: Biometric verification...',
     'step_3_5_attestation': 'Step 3/5: Issuing attestation...',
-    'step_4_5_nullifier': 'Step 4/5: Computing nullifier...',
+    'step_4_5_privacy': 'Step 4/5: Preparing anonymous submission...',
     'step_5_5_submitting': 'Step 5/5: Submitting vote...',
     'vote_already_recorded': 'Vote already recorded. Refreshing...',
     'failed_submit_vote': 'Failed to submit vote',
@@ -1069,8 +1069,9 @@ class LocalizationService extends ChangeNotifier {
     'failed_submit_survey': 'გამოკითხვის გაგზავნა ვერ მოხერხდა',
     'requesting_challenge': 'მოთხოვნა...',
     'step_1_4_challenge': 'ნაბიჯი 1/4: გამოწვევის მოთხოვნა...',
-    'step_2_4_attestation': 'ნაბიჯი 2/4: ატესტაციის გაცემა...',
-    'step_3_4_nullifier': 'ნაბიჯი 3/4: ნულიფაიერის გამოთვლა...',
+    'step_2_4_response_binding':
+        'ნაბიჯი 2/4: პასუხების კრიპტოგრაფიული დაფიქსირება...',
+    'step_3_4_attestation': 'ნაბიჯი 3/4: მოწყობილობის ატესტაციის გაცემა...',
     'step_4_4_submitting': 'ნაბიჯი 4/4: გამოკითხვის გაგზავნა...',
 
     // Confirm Vote
@@ -1079,7 +1080,7 @@ class LocalizationService extends ChangeNotifier {
     'step_1_5_challenge': 'ნაბიჯი 1/5: გამოწვევის მოთხოვნა...',
     'step_2_5_biometric': 'ნაბიჯი 2/5: ბიომეტრიული ვერიფიკაცია...',
     'step_3_5_attestation': 'ნაბიჯი 3/5: ატესტაციის გაცემა...',
-    'step_4_5_nullifier': 'ნაბიჯი 4/5: ნულიფაიერის გამოთვლა...',
+    'step_4_5_privacy': 'ნაბიჯი 4/5: ანონიმური გაგზავნის მომზადება...',
     'step_5_5_submitting': 'ნაბიჯი 5/5: ხმის გაგზავნა...',
     'vote_already_recorded': 'ხმა უკვე ჩაწერილია. განახლება...',
     'failed_submit_vote': 'ხმის გაგზავნა ვერ მოხერხდა',

@@ -8,8 +8,8 @@ import '../../models/poll.dart';
 import '../../models/reward_balance.dart';
 import '../../models/verification_models.dart';
 import '../interfaces/i_api_service.dart';
-import '../wallet_service.dart';
 import '../storage_service.dart';
+import '../device_attestation_service.dart';
 
 /// Real implementation of [IApiService] that calls the backend.
 /// All HTTP calls are unified here with consistent timeout, retry, and auth handling.
@@ -27,6 +27,9 @@ class RealApiService implements IApiService {
   String? _credential;
   String? _lastVoteNonce;
   String? _lastVotePollId;
+  DeviceAttestationEvidence? _lastAttestationEvidence;
+  int? _lastAttestationTimestampBucket;
+  String? _lastAttestationOptionId;
   final StorageService _storage = StorageService();
 
   Future<void> _ensureAuthenticated() async {
@@ -112,8 +115,7 @@ class RealApiService implements IApiService {
   Future<Map<String, dynamic>> requestChallenge() async {
     await _ensureAuthenticated();
 
-    final walletService = WalletService();
-    final deviceId = await walletService.getWalletAddress();
+    final deviceId = await _storage.getOrCreateInstallationId();
 
     final response = await http
         .post(
@@ -149,13 +151,25 @@ class RealApiService implements IApiService {
       throw Exception('Invalid poll/option');
     }
 
-    // Backend no longer issues vote attestations in Phase 0.
-    // Keep this method for UI compatibility, but enforce ordering/nonce rules.
+    final binding = DeviceAttestationService.buildVoteBinding(
+      nonce: nonce,
+      pollId: pollId,
+      optionId: optionId,
+      timestampBucket: timestampBucket,
+    );
+    final evidence = await DeviceAttestationService.getAttestationEvidence(
+      binding,
+    );
     _lastVoteNonce = nonce;
     _lastVotePollId = pollId;
+    _lastAttestationEvidence = evidence;
+    _lastAttestationTimestampBucket = timestampBucket;
+    _lastAttestationOptionId = optionId;
 
     return {
-      'attestation': 'mvp_attestation_${DateTime.now().millisecondsSinceEpoch}',
+      'attestation': evidence.token,
+      'platform': evidence.platform,
+      'provider': evidence.provider,
       'pollId': pollId,
       'optionId': optionId,
       'timestampBucket': timestampBucket,
@@ -163,7 +177,7 @@ class RealApiService implements IApiService {
     };
   }
 
-  // Retry configuration for vote submission (idempotent via nullifier)
+  // Retry configuration for a nonce-scoped idempotent vote submission.
   static const int _maxVoteRetries = 2;
   static const Duration _voteRetryDelay = Duration(milliseconds: 800);
 
@@ -171,7 +185,6 @@ class RealApiService implements IApiService {
   Future<Map<String, dynamic>> submitVote({
     required String pollId,
     required String optionId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
   }) async {
@@ -185,9 +198,20 @@ class RealApiService implements IApiService {
     if (_lastVotePollId != pollId) {
       throw Exception('Attestation is not bound to this poll');
     }
+    final evidence = _lastAttestationEvidence;
+    if (evidence == null || evidence.token != attestation) {
+      throw Exception('Missing or mismatched hardware attestation');
+    }
+    if (_lastAttestationTimestampBucket != timestampBucket ||
+        _lastAttestationOptionId != optionId) {
+      throw Exception('Attestation is not bound to this vote payload');
+    }
+    final deviceId = await _storage.getOrCreateInstallationId();
 
-    // Generate idempotency key from nullifier (unique per user per poll)
-    final idempotencyKey = 'vote-$pollId-$nullifier';
+    final idempotencyKey = DeviceAttestationService.buildVoteIdempotencyKey(
+      pollId,
+      nonce,
+    );
 
     int attempts = 0;
     Exception? lastError;
@@ -205,10 +229,16 @@ class RealApiService implements IApiService {
               body: json.encode({
                 'pollId': pollId,
                 'optionId': optionId,
-                'nullifier': nullifier,
                 'nonce': nonce,
-                'signature':
-                    attestation, // MVP placeholder (not validated server-side yet)
+                'timestampBucket': timestampBucket,
+                // Stored only as a one-way audit hash on the server.
+                'signature': attestation,
+                'device': {
+                  'id': deviceId,
+                  'platform': evidence.platform,
+                  'provider': evidence.provider,
+                },
+                'attestation': {'token': evidence.token},
               }),
             )
             .timeout(const Duration(seconds: 30));
@@ -218,12 +248,21 @@ class RealApiService implements IApiService {
         // Clear once used (successful or duplicate)
         _lastVoteNonce = null;
         _lastVotePollId = null;
+        _lastAttestationEvidence = null;
+        _lastAttestationTimestampBucket = null;
+        _lastAttestationOptionId = null;
 
         if (response.statusCode == 200) {
+          if (evidence.platform == 'ios') {
+            await DeviceAttestationService.confirmAppAttestRegistration();
+          }
           return json.decode(response.body);
         } else if (response.statusCode == 409) {
           // 409 Conflict = duplicate vote (idempotent success)
           debugPrint('[API] Vote already recorded (idempotent)');
+          if (evidence.platform == 'ios') {
+            await DeviceAttestationService.confirmAppAttestRegistration();
+          }
           return {'success': true, 'duplicate': true};
         } else {
           throw Exception(_parseError(response.body));
@@ -240,6 +279,9 @@ class RealApiService implements IApiService {
             errorStr.contains('not found')) {
           _lastVoteNonce = null;
           _lastVotePollId = null;
+          _lastAttestationEvidence = null;
+          _lastAttestationTimestampBucket = null;
+          _lastAttestationOptionId = null;
           rethrow;
         }
 
@@ -247,6 +289,9 @@ class RealApiService implements IApiService {
           debugPrint('[API] Vote submission failed after $attempts attempts');
           _lastVoteNonce = null;
           _lastVotePollId = null;
+          _lastAttestationEvidence = null;
+          _lastAttestationTimestampBucket = null;
+          _lastAttestationOptionId = null;
           rethrow;
         }
 
@@ -261,18 +306,35 @@ class RealApiService implements IApiService {
     // Should never reach here, but just in case
     _lastVoteNonce = null;
     _lastVotePollId = null;
+    _lastAttestationEvidence = null;
+    _lastAttestationTimestampBucket = null;
+    _lastAttestationOptionId = null;
     throw lastError ?? Exception('Vote submission failed');
   }
 
   @override
   Future<Map<String, dynamic>> submitSurvey({
     required String pollId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
     required List<Map<String, dynamic>> responses,
   }) async {
     await _ensureAuthenticated();
+
+    final nonce = _lastVoteNonce;
+    final evidence = _lastAttestationEvidence;
+    if (nonce == null || _lastVotePollId != pollId) {
+      throw Exception('Missing poll-bound survey nonce');
+    }
+    final expectedAttestationOption =
+        DeviceAttestationService.buildSurveyAttestationOption(responses);
+    if (evidence == null ||
+        evidence.token != attestation ||
+        _lastAttestationOptionId != expectedAttestationOption ||
+        _lastAttestationTimestampBucket != timestampBucket) {
+      throw Exception('Missing or mismatched survey attestation');
+    }
+    final deviceId = await _storage.getOrCreateInstallationId();
 
     final response = await http
         .post(
@@ -280,12 +342,37 @@ class RealApiService implements IApiService {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $_credential',
+            'X-Idempotency-Key':
+                DeviceAttestationService.buildSurveyIdempotencyKey(
+                  pollId,
+                  nonce,
+                ),
           },
-          body: json.encode({'nullifier': nullifier, 'responses': responses}),
+          body: json.encode({
+            'responses': responses,
+            'nonce': nonce,
+            'timestampBucket': timestampBucket,
+            'signature': attestation,
+            'device': {
+              'id': deviceId,
+              'platform': evidence.platform,
+              'provider': evidence.provider,
+            },
+            'attestation': {'token': evidence.token},
+          }),
         )
         .timeout(_httpTimeout);
 
+    _lastVoteNonce = null;
+    _lastVotePollId = null;
+    _lastAttestationEvidence = null;
+    _lastAttestationTimestampBucket = null;
+    _lastAttestationOptionId = null;
+
     if (response.statusCode == 200) {
+      if (evidence.platform == 'ios') {
+        await DeviceAttestationService.confirmAppAttestRegistration();
+      }
       return json.decode(response.body);
     } else {
       throw Exception(_parseError(response.body));

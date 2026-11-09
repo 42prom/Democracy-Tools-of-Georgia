@@ -1,6 +1,7 @@
 import { IHasher, IKeyedHasher } from './IHasher';
 import { HmacHasher } from './HmacHasher';
 import { PoseidonHasher } from './PoseidonHasher';
+import { getSecret } from '../config/vault';
 
 /**
  * CryptoRegistry — Dependency-injection registry for pluggable hash functions.
@@ -36,7 +37,7 @@ class CryptoRegistryClass {
     if (this.initialised) return;
 
     const hasherType = (process.env.CRYPTO_HASHER ?? 'hmac').toLowerCase() as HasherType;
-    const nullifierSecret = process.env.NULLIFIER_SECRET;
+    const nullifierSecret = getSecret('NULLIFIER_SECRET');
 
     console.log(`[CryptoRegistry] Initialising with hasher: ${hasherType}`);
 

@@ -337,11 +337,33 @@ export default function CreatePoll() {
   };
 
   const canPublish = () => {
-    // Allow publishing regardless of audience size (admin decision)
     if (title.trim() === '') return false;
+    // Publishing is fail-closed until the server confirms the audience meets
+    // the configured privacy threshold.
+    if (estimateState !== 'safe' || !estimateData?.isPrivacySafe) return false;
+
+    if (startDate && endDate && new Date(startDate).getTime() >= new Date(endDate).getTime()) {
+      return false;
+    }
+
+    if (rewardsEnabled) {
+      const amount = Number(rewardAmount);
+      if (!Number.isFinite(amount) || amount <= 0 || !rewardToken) return false;
+    }
 
     if (pollType === 'survey') {
-      return surveyQuestions.some((q) => q.questionText.trim() !== '');
+      const populatedQuestions = surveyQuestions.filter((q) => q.questionText.trim() !== '');
+      if (populatedQuestions.length === 0) return false;
+
+      return populatedQuestions.every((question) => {
+        if (['single_choice', 'multiple_choice', 'ranked_choice'].includes(question.questionType)) {
+          return question.options.filter((option) => option.text.trim() !== '').length >= 2;
+        }
+        if (question.questionType === 'rating_scale') {
+          return Number(question.config.max) > Number(question.config.min);
+        }
+        return true;
+      });
     }
 
     if (pollType === 'referendum') {
@@ -1224,4 +1246,3 @@ export default function CreatePoll() {
     </div>
   );
 }
-

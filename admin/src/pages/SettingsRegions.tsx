@@ -196,6 +196,8 @@ export default function SettingsRegions() {
           />
           {searchQuery && (
             <button
+              type="button"
+              aria-label="Clear region search"
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
@@ -275,12 +277,16 @@ export default function SettingsRegions() {
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-2">
                       <button
+                        type="button"
+                        aria-label={`Edit ${region.name_en}`}
                         onClick={() => handleEdit(region)}
                         className="p-1 text-gray-600 hover:text-primary-600"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        type="button"
+                        aria-label={`Delete ${region.name_en}`}
                         onClick={() => handleDelete(region)}
                         className="p-1 text-gray-600 hover:text-red-600"
                       >

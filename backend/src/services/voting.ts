@@ -1,5 +1,5 @@
 import { query, transaction } from '../db/client';
-import { VoteSubmission } from '../types/polls';
+import { AudienceRules, VoteSubmission } from '../types/polls';
 import { VotingCredential } from '../types/credentials';
 import NonceService from './nonce';
 import { createError } from '../middleware/errorHandler';
@@ -7,6 +7,80 @@ import { SecurityService } from './security';
 import { computeNullifier } from './nullifier';
 import { computeVoteLeaf, buildMerkleRoot } from './merkle';
 import { signReceipt, SignedReceipt } from './receiptSigner';
+import { createHash } from 'node:crypto';
+
+export function buildVoteAttestationBinding(
+  voteData: Pick<VoteSubmission, 'nonce' | 'pollId' | 'optionId' | 'timestampBucket'>
+): string {
+  const canonical =
+    `dtg-vote-v1|${voteData.nonce}|${voteData.pollId}|` +
+    `${voteData.optionId}|${voteData.timestampBucket}`;
+  return createHash('sha256').update(canonical, 'utf8').digest('hex');
+}
+
+/** Enforce the shared device-integrity policy for votes and surveys. */
+export async function enforceDeviceAttestation(
+  voteData: VoteSubmission,
+  credentialSubject?: string
+): Promise<void> {
+  const settingsResult = await query(
+    "SELECT key, value FROM settings WHERE key LIKE 'security_%'"
+  );
+  const settings = settingsResult.rows.reduce(
+    (accumulator, row) => ({ ...accumulator, [row.key]: row.value }),
+    {} as Record<string, string>
+  );
+  const requireAttestation =
+    process.env.REQUIRE_DEVICE_ATTESTATION === 'true' ||
+    settings.security_require_device_attestation_for_vote === 'true';
+
+  if (!requireAttestation) return;
+  if (!voteData.attestation?.token) {
+    throw createError('Security Policy: Hardware device attestation is required to vote.', 403);
+  }
+
+  const currentTimestampBucket = Math.floor(Date.now() / 60_000);
+  if (
+    !Number.isInteger(voteData.timestampBucket) ||
+    Math.abs(currentTimestampBucket - voteData.timestampBucket) > 2
+  ) {
+    throw createError('Security Policy: Attestation timestamp is stale or invalid.', 403);
+  }
+
+  const { DeviceAttestationService } = await import('./deviceAttestation');
+  const platform = voteData.device?.platform || 'unknown';
+  const attestationResult = await DeviceAttestationService.verify(
+    platform,
+    voteData.device?.provider || 'auto',
+    voteData.attestation.token,
+    buildVoteAttestationBinding(voteData),
+    credentialSubject
+  );
+  if (!attestationResult.success) {
+    await SecurityService.logSecurityEvent('SIGNATURE_FAIL', {
+      reason: 'attestation_failed',
+      verdict: attestationResult.verdict,
+      detail: attestationResult.reason,
+      pollId: voteData.pollId,
+      platform,
+    });
+    throw createError(
+      `Security Policy: Device integrity check failed (${attestationResult.verdict}).`,
+      403
+    );
+  }
+
+  const minimumVerdict = await DeviceAttestationService.getMinimumRequiredVerdict();
+  if (!DeviceAttestationService.meetsMinimum(attestationResult.verdict, minimumVerdict)) {
+    throw createError(
+      `Security Policy: Device does not meet minimum integrity requirement (required: ${minimumVerdict}, got: ${attestationResult.verdict}).`,
+      403
+    );
+  }
+  console.log(
+    `[Voting] Attestation passed: platform=${platform}, verdict=${attestationResult.verdict}`
+  );
+}
 
 /**
  * Minimizes demographics to bucketed fields only (Privacy requirement)
@@ -17,6 +91,64 @@ export function buildDemographicsSnapshot(data: any): any {
     age_bucket: data.age_bucket || 'unknown',
     gender: data.gender || 'unknown'
   };
+}
+
+/** Enforce the same audience policy at submission time that is used for poll discovery. */
+export async function enforceAudienceEligibility(
+  pollId: string,
+  rules: AudienceRules,
+  credential: VotingCredential
+): Promise<void> {
+  const reject = async (reason: string, message: string, details: Record<string, unknown> = {}) => {
+    await SecurityService.logSecurityEvent('ELIGIBILITY_FAIL', {
+      reason,
+      pollId,
+      ...details,
+    });
+    throw createError(message, 403);
+  };
+
+  if (rules.min_age || rules.max_age) {
+    const bucket = credential.data.age_bucket;
+    const match = bucket?.match(/^(\d+)-(\d+)$/);
+    const userMinAge = bucket === '65+' ? 65 : match ? Number(match[1]) : undefined;
+    const userMaxAge = bucket === '65+' ? Number.POSITIVE_INFINITY : match ? Number(match[2]) : undefined;
+    if (userMinAge === undefined || userMaxAge === undefined) {
+      await reject('age_missing', 'Not eligible for this poll (age)');
+    }
+    if (rules.min_age && userMaxAge! < rules.min_age) {
+      await reject('age_below_minimum', 'Not eligible for this poll (age)', {
+        requiredMinimum: rules.min_age,
+        actualBucket: bucket,
+      });
+    }
+    if (rules.max_age && userMinAge! > rules.max_age) {
+      await reject('age_above_maximum', 'Not eligible for this poll (age)', {
+        requiredMaximum: rules.max_age,
+        actualBucket: bucket,
+      });
+    }
+  }
+
+  if (rules.gender && rules.gender !== 'all' && credential.data.gender !== rules.gender) {
+    await reject('gender_mismatch', 'Not eligible for this poll (gender)', {
+      required: rules.gender,
+      actual: credential.data.gender,
+    });
+  }
+
+  if (rules.regions?.length) {
+    const regionCandidates = new Set([
+      ...(credential.data.region ? [credential.data.region] : []),
+      ...(credential.data.region_codes || []),
+    ]);
+    const hasMatch = rules.regions.some(region => regionCandidates.has(region));
+    if (!hasMatch) {
+      await reject('region_mismatch', 'Not eligible for this poll (region)', {
+        required: rules.regions,
+      });
+    }
+  }
 }
 
 /**
@@ -117,77 +249,12 @@ export async function submitVote(
   // ─────────────────────────────────────────────────────────
   // STEP 5 — Audience rules (gender, region)
   // ─────────────────────────────────────────────────────────
-  const rules = poll.audience_rules;
-
-  if (rules.gender && rules.gender !== 'all' && credential.data.gender !== rules.gender) {
-    await SecurityService.logSecurityEvent('ELIGIBILITY_FAIL', {
-      reason: 'gender_mismatch',
-      pollId: voteData.pollId,
-      required: rules.gender,
-      actual: credential.data.gender
-    });
-    throw createError('Not eligible for this poll (gender)', 403);
-  }
-
-  if (rules.regions && rules.regions.length > 0) {
-    const snapshot = buildDemographicsSnapshot(credential.data);
-    const userRegion = snapshot.region;
-    if (!userRegion || userRegion === 'unknown') {
-      await SecurityService.logSecurityEvent('ELIGIBILITY_FAIL', {
-        reason: 'region_missing',
-        pollId: voteData.pollId
-      });
-      throw createError('Not eligible for this poll (region) - no region data in credential', 403);
-    }
-    if (!rules.regions.includes(userRegion)) {
-      await SecurityService.logSecurityEvent('ELIGIBILITY_FAIL', {
-        reason: 'region_mismatch',
-        pollId: voteData.pollId,
-        required: rules.regions,
-        actual: userRegion
-      });
-      throw createError('Not eligible for this poll (region)', 403);
-    }
-  }
+  await enforceAudienceEligibility(voteData.pollId, poll.audience_rules || {}, credential);
 
   // ─────────────────────────────────────────────────────────
   // STEP 6 — Security policy enforcement (device attestation)
   // ─────────────────────────────────────────────────────────
-  const settingsRes = await query("SELECT key, value FROM settings WHERE key LIKE 'security_%'");
-  const settings = settingsRes.rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {} as any);
-  const requireAttestation = settings.security_require_device_attestation_for_vote === 'true';
-
-  if (requireAttestation) {
-    if (!voteData.attestation?.token) {
-      throw createError('Security Policy: Hardware device attestation is required to vote.', 403);
-    }
-    const { DeviceAttestationService } = await import('./deviceAttestation');
-    const platform = voteData.device?.platform || 'unknown';
-    const attestationResult = await DeviceAttestationService.verify(
-      platform, 'auto', voteData.attestation.token, voteData.nonce
-    );
-    if (!attestationResult.success) {
-      await SecurityService.logSecurityEvent('SIGNATURE_FAIL', {
-        reason: 'attestation_failed',
-        verdict: attestationResult.verdict,
-        detail: attestationResult.reason,
-        pollId: voteData.pollId,
-        platform,
-      });
-      throw createError(
-        `Security Policy: Device integrity check failed (${attestationResult.verdict}).`,
-        403
-      );
-    }
-    const minimumVerdict = await DeviceAttestationService.getMinimumRequiredVerdict();
-    if (!DeviceAttestationService.meetsMinimum(attestationResult.verdict, minimumVerdict)) {
-      throw createError(
-        `Security Policy: Device does not meet minimum integrity requirement (required: ${minimumVerdict}, got: ${attestationResult.verdict}).`,
-        403
-      );
-    }
-    console.log(`[Voting] Attestation passed: platform=${platform}, verdict=${attestationResult.verdict}`);
-  }
+  await enforceDeviceAttestation(voteData, credential.sub);
 
   // ─────────────────────────────────────────────────────────
   // STEP 7 — Device-voter rate limit
@@ -199,7 +266,7 @@ export async function submitVote(
 
   // ─────────────────────────────────────────────────────────
   // STEP 8 — SERVER-COMPUTED nullifier
-  // Client-supplied nullifier (voteData.nullifier) is IGNORED.
+  // The client never supplies the nullifier or its source material.
   // The nullifier is deterministic: HMAC-SHA256(NULLIFIER_SECRET, voterSub|pollId).
   // ─────────────────────────────────────────────────────────
   const serverNullifier = await computeNullifier(credential.sub, voteData.pollId);
@@ -235,10 +302,42 @@ export async function submitVote(
   // ─────────────────────────────────────────────────────────
   let finalVoteId = '';
   let finalMerkleRoot = '';
+  let signedReceipt: SignedReceipt | undefined;
   let rewardInfo: VoteResult['reward'] | undefined;
 
   try {
     await transaction(async (client) => {
+
+      // Serialize all votes for the same poll. This is required because the
+      // Merkle root is a read/modify/write aggregate over every committed leaf.
+      await client.query(
+        `SELECT pg_advisory_xact_lock(
+           hashtext('dtg-vote-v1'),
+           hashtext($1::text)
+         )`,
+        [voteData.pollId]
+      );
+
+      // Re-check mutable poll state inside the serialized transaction. The
+      // earlier checks provide fast rejection; these are the commit barrier.
+      const lockedPollResult = await client.query(
+        `SELECT status, start_at, end_at, rewards_enabled, reward_amount, reward_token
+         FROM polls
+         WHERE id = $1
+         FOR SHARE`,
+        [voteData.pollId]
+      );
+      if (lockedPollResult.rows.length === 0 || lockedPollResult.rows[0].status !== 'active') {
+        throw createError('Poll not found or not active', 404);
+      }
+      const lockedPoll = lockedPollResult.rows[0];
+      const commitTime = new Date();
+      if (lockedPoll.start_at && new Date(lockedPoll.start_at) > commitTime) {
+        throw createError('Poll has not started yet', 403);
+      }
+      if (lockedPoll.end_at && new Date(lockedPoll.end_at) < commitTime) {
+        throw createError('Poll has already ended', 403);
+      }
 
       // 10a. Record device-voter link (rate limiting only; not linked to vote)
       await SecurityService.recordDeviceVoter(voteData.pollId, deviceHash, voterHash, client);
@@ -274,18 +373,21 @@ export async function submitVote(
         bucketTs,
       });
 
-      // 10f. Fetch ALL existing leaf hashes for this poll (ordered by created_at)
-      //      to recompute the incremental Merkle root.
-      //      Note: for large polls (>1000 votes) consider caching intermediate nodes.
-      const leavesRes = await client.query(
-        `SELECT vote_hash FROM votes WHERE poll_id = $1 AND id != $2 AND vote_hash IS NOT NULL
-         ORDER BY created_at ASC`,
-        [voteData.pollId, finalVoteId]
+      // Persist the current leaf before reading the canonical leaf set.
+      await client.query(
+        `UPDATE votes SET vote_hash = $1 WHERE id = $2`,
+        [leafHash, finalVoteId]
       );
-      const allLeaves: string[] = [
-        ...leavesRes.rows.map((r: any) => r.vote_hash as string),
-        leafHash,
-      ];
+
+      // 10f. Fetch ALL leaf hashes in deterministic order. UUID tie-breaking is
+      // required because privacy-bucketed timestamps are intentionally shared.
+      const leavesRes = await client.query(
+        `SELECT vote_hash FROM votes
+         WHERE poll_id = $1 AND vote_hash IS NOT NULL
+         ORDER BY bucket_ts ASC, id ASC`,
+        [voteData.pollId]
+      );
+      const allLeaves: string[] = leavesRes.rows.map((r: any) => r.vote_hash as string);
 
       // 10g. Compute new Merkle root and update polls.merkle_root
       const newMerkleRoot = buildMerkleRoot(allLeaves);
@@ -300,7 +402,7 @@ export async function submitVote(
       // Keep previous_hash / chain_hash for backward compatibility (deprecation path)
       const prevVoteRes = await client.query(
         `SELECT chain_hash FROM votes WHERE poll_id = $1 AND id != $2
-         ORDER BY created_at DESC LIMIT 1`,
+         ORDER BY bucket_ts DESC, id DESC LIMIT 1`,
         [voteData.pollId, finalVoteId]
       );
       const prevHash = prevVoteRes.rows[0]?.chain_hash
@@ -314,9 +416,18 @@ export async function submitVote(
         [leafHash, prevHash, newMerkleRoot, finalVoteId]
       );
 
+      // Receipt signing is part of the transaction boundary. If the key is
+      // missing, invalid, or unavailable, the vote transaction must roll back.
+      signedReceipt = signReceipt({
+        voteId: finalVoteId,
+        pollId: voteData.pollId,
+        leafHash,
+        merkleRoot: newMerkleRoot,
+        ts: bucketTs.toISOString(),
+      });
+
       // 10h. Store attestation receipt — SHA256 of signature (unlinkable)
       // Also store Ed25519 server signature of (voteId|pollId|leafHash) for audit
-      const { createHash } = await import('crypto');
       const attestationHash = createHash('sha256').update(voteData.signature).digest('hex');
 
       await client.query(
@@ -336,7 +447,7 @@ export async function submitVote(
       });
 
       // 10i. Optional reward
-      if (poll.rewards_enabled && poll.reward_amount > 0) {
+      if (lockedPoll.rewards_enabled && lockedPoll.reward_amount > 0) {
         const existingReward = await client.query(
           'SELECT id FROM user_rewards WHERE poll_id = $1 AND device_key_hash = $2',
           [voteData.pollId, credential.sub]
@@ -346,13 +457,13 @@ export async function submitVote(
             `INSERT INTO user_rewards (device_key_hash, poll_id, amount, token_symbol, status)
              VALUES ($1, $2, $3, $4, 'pending')
              RETURNING id`,
-            [credential.sub, voteData.pollId, poll.reward_amount, poll.reward_token || 'DTG']
+            [credential.sub, voteData.pollId, lockedPoll.reward_amount, lockedPoll.reward_token || 'DTG']
           );
           if (rewardResult.rows.length > 0) {
             rewardInfo = {
               issued: true,
-              amount: parseFloat(poll.reward_amount),
-              tokenSymbol: poll.reward_token || 'DTG',
+              amount: parseFloat(lockedPoll.reward_amount),
+              tokenSymbol: lockedPoll.reward_token || 'DTG',
               rewardTxHash: 'reward_' + voteData.pollId + '_' + Date.now(),
             };
           }
@@ -371,39 +482,10 @@ export async function submitVote(
   }
 
   // ─────────────────────────────────────────────────────────
-  // STEP 11 — Build and sign cryptographic receipt (Ed25519)
+  // STEP 11 — Confirm the transaction produced a signed receipt
   // ─────────────────────────────────────────────────────────
-  const leafHash = computeVoteLeaf({
-    pollId: voteData.pollId,
-    optionId: voteData.optionId,
-    nullifier: serverNullifier,
-    bucketTs,
-  });
-
-  let signedReceipt: SignedReceipt;
-  try {
-    signedReceipt = signReceipt({
-      voteId: finalVoteId,
-      pollId: voteData.pollId,
-      leafHash,
-      merkleRoot: finalMerkleRoot,
-      ts: bucketTs.toISOString(),
-    });
-  } catch (sigErr: any) {
-    // Receipt signing is best-effort — don't fail the vote if key not configured
-    console.warn('[Voting] Receipt signing unavailable:', sigErr.message);
-    signedReceipt = {
-      payload: {
-        voteId: finalVoteId,
-        pollId: voteData.pollId,
-        leafHash,
-        merkleRoot: finalMerkleRoot,
-        ts: bucketTs.toISOString(),
-      },
-      signature: 'SIGNING_KEY_NOT_CONFIGURED',
-      algorithm: 'Ed25519',
-      version: 1,
-    };
+  if (!signedReceipt) {
+    throw new Error('[Voting] Transaction completed without a signed receipt.');
   }
 
   // ─────────────────────────────────────────────────────────

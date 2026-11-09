@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAdmin } from '../../middleware/auth';
+import { requireAdmin, requireAdminRole } from '../../middleware/auth';
 import { pool } from '../../db/client';
 import redisClient from '../../db/redis';
 
@@ -7,6 +7,7 @@ const router = Router();
 
 // All admin routes require authentication
 router.use(requireAdmin);
+router.use(requireAdminRole('superadmin', 'admin'));
 
 /**
  * GET /api/v1/admin/profiles

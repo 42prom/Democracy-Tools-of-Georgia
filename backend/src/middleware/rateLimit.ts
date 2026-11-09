@@ -18,3 +18,25 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts, please try again later.' }
 });
+
+// Admin credentials are high-value and must not be brute-forced. Successful
+// logins do not consume the failure budget; production should additionally use
+// a shared Redis-backed limiter when running more than one API replica.
+export const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many failed admin login attempts. Try again later.' },
+});
+
+// A separate authenticated admin budget prevents expensive control-plane
+// scraping while keeping the public API limiter independent.
+export const adminApiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin requests. Try again later.' },
+});

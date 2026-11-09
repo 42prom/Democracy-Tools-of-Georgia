@@ -20,11 +20,16 @@ console.log(`[Startup] Loaded .env.NODE_ENV="${process.env.NODE_ENV}"`);
 import express, { Express } from 'express';
 import compression from 'compression';
 import { connectRedis, closeRedis } from './db/redis';
-import { close as closeDb, checkHealth as checkDbHealth } from './db/client';
+import {
+  close as closeDb,
+  checkHealth as checkDbHealth,
+  assertRestrictedDatabaseRole,
+} from './db/client';
 import { securityHeaders, corsMiddleware, permissionsPolicy } from './middleware/security';
 import { requestLogger } from './middleware/logger';
 import { requestIdMiddleware } from './middleware/requestId';
-import { apiLimiter } from './middleware/rateLimit';
+import { apiLimiter, adminApiLimiter } from './middleware/rateLimit';
+import { adminSecurityBoundary } from './middleware/adminAuthorization';
 import { dynamicRateLimit } from './middleware/dynamicRateLimit';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { metricsMiddleware } from './middleware/metrics';
@@ -43,6 +48,8 @@ import adminSecurityRouter from './routes/admin/security';
 import adminTicketsRouter from './routes/admin/tickets';
 import adminGeoBlockingRouter from './routes/admin/geoBlocking';
 import adminShieldRouter from './routes/admin/shield';
+import adminUsersRouter from './routes/admin/users';
+import adminAuditRouter from './routes/admin/audit';
 import statsRouter from './routes/stats';
 import ticketsRouter from './routes/tickets';
 
@@ -61,12 +68,16 @@ import { CryptoRegistry } from './crypto/CryptoRegistry';
 
 import { VoteAnchorService } from './services/voteAnchor';
 
-import { AppConfig, isTest } from './config/app';
+import { AppConfig, isProd, isTest } from './config/app';
 const app: Express = express();
 const PORT = AppConfig.PORT;
 
-// Trust proxy headers (e.g. from Shield, Cloudflare)
-app.set('trust proxy', true);
+const workerEnabled = (name: string): boolean =>
+  process.env[name]?.trim().toLowerCase() === 'true';
+
+// Trust only the explicitly configured number of reverse-proxy hops. Using
+// `true` lets a direct client spoof X-Forwarded-For and evade IP controls.
+app.set('trust proxy', AppConfig.TRUST_PROXY_HOPS);
 
 // Middleware stack
 app.use(compression());
@@ -78,9 +89,11 @@ if (AppConfig.ENABLE_DEBUG_LOGGING) {
   app.use((req, _res, next) => {
     const bodyStr = JSON.stringify(req.body);
     const bodySize = bodyStr ? bodyStr.length : 0;
-    // Truncate huge bodies in logs
-    const logBody = bodySize > 1000 ? `[${bodySize} bytes]` : bodyStr;
-    console.log(`[HTTP] ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - Body: ${logBody}`);
+    const bodyKeys = req.body && typeof req.body === 'object'
+      ? Object.keys(req.body).slice(0, 20).join(',')
+      : '';
+    // Enrollment bodies can contain PII and images. Never print body values.
+    console.log(`[HTTP] ${req.method} ${req.path} - Content-Type: ${req.headers['content-type']} - BodyBytes: ${bodySize} - BodyKeys: ${bodyKeys}`);
     
     // Detailed security reset logging (always useful in dev/test)
     if (req.path.includes('reset-security') || req.path.includes('reset-enrollment')) {
@@ -146,12 +159,13 @@ app.use('/', (req, res, next) => {
 
 // API v1 routes
 app.use('/api/v1/auth', dynamicRateLimit('login'), authRouter); // Dynamic limit for auth
-// Admin routes receive NO rate limiting to prevent lockout
-// Admin routes receive NO rate limiting (handled above) 
+// Admin control plane: a dedicated abuse budget plus a centralized,
+// default-deny authentication/CSRF/authorization boundary.
 
 app.use('/api/v1/enrollment', dynamicRateLimit('enrollment'), enrollmentRouter); // Dynamic limit for enrollment
 app.use('/api/v1/polls', pollsRouter);
 app.use('/api/v1/messages', messagesRouter); // New Public messages route
+app.use('/api/v1/admin', adminApiLimiter, adminSecurityBoundary);
 app.use('/api/v1/admin/auth', adminAuthRouter);
 app.use('/api/v1/admin/polls', adminPollsRouter);
 app.use('/api/v1/admin/regions', adminRegionsRouter);
@@ -164,6 +178,8 @@ app.use('/api/v1/admin/security-events', adminSecurityRouter);
 app.use('/api/v1/admin/tickets', adminTicketsRouter);
 app.use('/api/v1/admin/geo-blocking', adminGeoBlockingRouter);
 app.use('/api/v1/admin/shield', adminShieldRouter);
+app.use('/api/v1/admin/users', adminUsersRouter);
+app.use('/api/v1/admin/audit', adminAuditRouter);
 app.use('/api/v1/stats', statsRouter);
 app.use('/api/v1/tickets', ticketsRouter);
 app.use('/api/v1/analytics', statsRouter); // Analytics endpoint (alias for stats)
@@ -201,6 +217,10 @@ async function startServer() {
     // Check Database connection
     const dbConnected = await checkDbHealth();
     if (dbConnected) {
+      if (workerEnabled('ENFORCE_RESTRICTED_DB_ROLE')) {
+        await assertRestrictedDatabaseRole();
+        console.log('✓ PostgreSQL runtime role is restricted');
+      }
       console.log('✓ Database connected');
       
       // Verification check for required columns
@@ -210,15 +230,19 @@ async function startServer() {
           WHERE table_name = 'users' AND column_name = 'device_key_thumbprint'
         `);
         if (columnCheck.rows.length === 0) {
-          console.warn('⚠️  CRITICAL: Database schema is out of sync. Missing "device_key_thumbprint" in "users" table.');
-          console.warn('   Run "npm run migrate" or "npm run db:reset" to fix.');
+          const message = 'Database schema is out of sync: users.device_key_thumbprint is missing.';
+          if (isProd) throw new Error(message);
+          console.warn(`⚠️  CRITICAL: ${message}`);
         }
       } catch (err: any) {
+        if (isProd) throw err;
         console.warn('⚠️  Warning: Could not verify database schema during startup:', err.message);
       }
     } else {
       console.error('❌ Database connection failed during startup');
-      // process.exit(1); // Optional: Un-comment if you want strict failure
+      if (isProd) {
+        throw new Error('Production startup aborted because PostgreSQL is unavailable.');
+      }
     }
 
     // === SHIELD STARTUP SYNCHRONIZATION ===
@@ -240,6 +264,7 @@ async function startServer() {
       await redisClient.set('security:settings', JSON.stringify(securityPayload));
       console.log('✓ Shield Gateway synchronized');
     } catch (err) {
+      if (isProd) throw err;
       console.warn('⚠️  Warning: Shield synchronization failed during startup:', err);
     }
 
@@ -250,13 +275,34 @@ async function startServer() {
       console.log(`✓ Health check: http://localhost:${PORT}/health`);
     });
 
-    // Start Background Services
-    const { RewardProcessor } = await import('./services/rewardProcessor');
-    const { PollStatusMonitor } = await import('./services/pollMonitor');
-    
-    RewardProcessor.start();
-    PollStatusMonitor.start();
-    VoteAnchorService.start();
+    // Side-effecting workers are explicit opt-in. A web/API smoke test must
+    // never submit payouts, anchors, or mutate poll state just by booting.
+    if (workerEnabled('REWARD_PROCESSOR_ENABLED')) {
+      const { RewardProcessor } = await import('./services/rewardProcessor');
+      RewardProcessor.start();
+    } else {
+      console.log('[Startup] Reward processor disabled');
+    }
+
+    if (workerEnabled('POLL_STATUS_MONITOR_ENABLED')) {
+      const { PollStatusMonitor } = await import('./services/pollMonitor');
+      PollStatusMonitor.start();
+    } else {
+      console.log('[Startup] Poll status monitor disabled');
+    }
+
+    if (workerEnabled('VOTE_ANCHOR_ENABLED')) {
+      VoteAnchorService.start();
+    } else {
+      console.log('[Startup] Vote anchor service disabled');
+    }
+
+    if (workerEnabled('AUDIT_CHECKPOINT_ENABLED')) {
+      const { AuditCheckpointService } = await import('./services/auditCheckpoint');
+      AuditCheckpointService.start();
+    } else {
+      console.log('[Startup] Audit checkpoint service disabled');
+    }
 
     // Store server instance for graceful shutdown
     (app as any).server = server;
@@ -282,20 +328,22 @@ async function shutdown() {
       });
     }
 
-    await closeRedis();
-    await closeDb();
-
     // Stop Background Services
     try {
       const { RewardProcessor } = await import('./services/rewardProcessor');
       const { PollStatusMonitor } = await import('./services/pollMonitor');
       const { pushService } = await import('./services/pushNotifications');
+      const { AuditCheckpointService } = await import('./services/auditCheckpoint');
       
       RewardProcessor.stop();
       PollStatusMonitor.stop();
       VoteAnchorService.stop();
+      AuditCheckpointService.stop();
       await pushService.shutdown();
     } catch (e) { console.warn('[Shutdown] Non-critical error stopping services:', e); }
+
+    await closeRedis();
+    await closeDb();
 
     console.log('✓ Connections closed');
     process.exit(0);
@@ -313,7 +361,7 @@ async function validateEnvironment() {
   
   const bioServiceUrl = AppConfig.BIOMETRIC.URL;
   if (bioServiceUrl && bioServiceUrl.includes('localhost') && AppConfig.NODE_ENV === 'production') {
-    console.warn('⚠️  WARNING: BIOMETRIC_SERVICE_URL uses localhost in production. Use Docker service name instead.');
+    throw new Error('BIOMETRIC_SERVICE_URL must not use localhost in production.');
   }
   
   console.log(`✓ BIOMETRIC_SERVICE_URL: ${bioServiceUrl}`);
@@ -322,13 +370,15 @@ async function validateEnvironment() {
   // We can double check here if we want, or rely on config/secrets to throw early
   try {
     const { getJwtSecret, getPnHashSecret, getApiKeyEncryptionSecret } = await import('./config/secrets');
+    const { assertProductionSecurityConfiguration } = await import('./config/securityValidation');
     getJwtSecret();
     getPnHashSecret();
     getApiKeyEncryptionSecret();
+    assertProductionSecurityConfiguration();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`❌ FATAL: ${msg}`);
-    process.exit(1);
+    throw new Error(msg);
   }
 }
 

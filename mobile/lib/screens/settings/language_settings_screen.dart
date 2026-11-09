@@ -12,9 +12,7 @@ class LanguageSettingsScreen extends StatelessWidget {
         final isGeorgian = locService.currentLanguage == AppLanguage.georgian;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(locService.translate('language')),
-          ),
+          appBar: AppBar(title: Text(locService.translate('language'))),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -23,9 +21,9 @@ class LanguageSettingsScreen extends StatelessWidget {
                 // Header
                 Text(
                   locService.translate('select_language'),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 24),
 
@@ -181,10 +179,7 @@ class _LanguageOption extends StatelessWidget {
             // Language code
             Text(
               language.code.toUpperCase(),
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
             // Checkmark
             if (isSelected) ...[

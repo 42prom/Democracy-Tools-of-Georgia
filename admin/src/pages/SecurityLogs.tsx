@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DateTimePicker24h from '../components/ui/DateTimePicker24h';
-import { securityEventsApi } from '../api/client';
+import { adminAuditApi, securityEventsApi } from '../api/client';
+import type { AdminAuditEntry, AdminAuditVerification } from '../api/client';
 import { formatDate } from '../utils/format';
 import type { SecurityEventsSummary } from '../types';
 import { clsx } from 'clsx';
@@ -12,6 +13,8 @@ export default function SecurityLogs() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [adminAudit, setAdminAudit] = useState<AdminAuditEntry[]>([]);
+  const [auditVerification, setAuditVerification] = useState<AdminAuditVerification | null>(null);
 
   useEffect(() => {
     loadSummary();
@@ -20,11 +23,17 @@ export default function SecurityLogs() {
   const loadSummary = async () => {
     setLoading(true);
     try {
-      const data = await securityEventsApi.getSummary({
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-      });
+      const [data, audit, verification] = await Promise.all([
+        securityEventsApi.getSummary({
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        }),
+        adminAuditApi.list(50),
+        adminAuditApi.verify(),
+      ]);
       setSummary(data);
+      setAdminAudit(audit.entries);
+      setAuditVerification(verification);
     } catch (error) {
       console.error('Failed to load security events:', error);
     } finally {
@@ -251,6 +260,35 @@ export default function SecurityLogs() {
             Time range: {formatDate(summary.metadata.timeRange.start)} -{' '}
             {formatDate(summary.metadata.timeRange.end)}
           </div>
+
+          <Card className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Administrative audit ledger</h2>
+                <p className="text-xs text-gray-500">Append-only, hash-chained control-plane actions</p>
+              </div>
+              <span className={auditVerification?.valid ? 'text-green-700' : 'text-red-700'}>
+                {auditVerification?.valid ? `Chain valid (${auditVerification.entries})` : `Chain broken at ${auditVerification?.brokenAt ?? 'unknown'}`}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b"><th className="text-left p-2">Time</th><th className="text-left p-2">Event</th><th className="text-left p-2">Actor</th><th className="text-left p-2">Operation</th><th className="text-left p-2">Hash</th></tr></thead>
+                <tbody>
+                  {adminAudit.map(entry => (
+                    <tr key={entry.id} className="border-b border-gray-100">
+                      <td className="p-2 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
+                      <td className="p-2">{entry.eventType}</td>
+                      <td className="p-2 font-mono text-xs">{String(entry.payload.adminUserId || entry.payload.subject || '-')}</td>
+                      <td className="p-2">{[entry.payload.method, entry.payload.path, entry.payload.statusCode].filter(Boolean).join(' ') || '-'}</td>
+                      <td className="p-2 font-mono text-xs">{entry.rowHash.slice(0, 12)}…</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {adminAudit.length === 0 && <p className="text-center py-6 text-gray-500">No administrative audit events.</p>}
+            </div>
+          </Card>
         </>
       ) : (
         <Card className="text-center py-12">

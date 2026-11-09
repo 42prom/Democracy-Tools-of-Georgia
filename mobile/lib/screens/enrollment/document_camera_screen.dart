@@ -165,7 +165,10 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen> {
                       ),
                       child: Text(
                         loc.translate('ensure_good_lighting'),
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],

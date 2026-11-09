@@ -1,0 +1,6 @@
+# Copy this file to key.properties. The real file and keystore are local secrets.
+# Prefer credentials supplied by a protected CI secret store for release builds.
+storeFile=C:\\secure-path\\dtg-release.jks
+storePassword=CHANGE_ME
+keyAlias=dtg-release
+keyPassword=CHANGE_ME

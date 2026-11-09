@@ -95,7 +95,7 @@ describe('Insights Page', () => {
     it('shows loading state initially', () => {
       render(<Insights />);
       expect(screen.getByText('User Insights')).toBeInTheDocument();
-      expect(screen.getByText(/Aggregated distributions with k-anonymity enforcement/)).toBeInTheDocument();
+      expect(screen.getByText(/Aggregated distributions with privacy protection/)).toBeInTheDocument();
     });
 
     it('displays insights after loading', async () => {
@@ -113,7 +113,7 @@ describe('Insights Page', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Privacy Protection Enabled')).toBeInTheDocument();
-        expect(screen.getByText(/k-anonymity enforcement/)).toBeInTheDocument();
+        expect(screen.getAllByText(/k-anonymity enforcement/).length).toBeGreaterThan(0);
       });
     });
   });
@@ -131,7 +131,7 @@ describe('Insights Page', () => {
         // In our mock, 65+ age bucket and Other gender are suppressed
         const allText = screen.getByText(/65\+/).parentElement?.textContent || '';
         expect(allText).toContain('<k');
-        expect(allText).not.toMatch(/\b\d+\b/); // No numeric count
+        expect(allText).not.toMatch(/\b(?:[1-9]|[12]\d)\b/); // No leaked sub-k count
       });
     });
 
@@ -301,8 +301,8 @@ describe('Insights Page', () => {
 
       const queryButton = screen.getByRole('button', { name: /Query Insights/i });
 
-      // Execute 20 queries to exhaust budget
-      for (let i = 0; i < 20; i++) {
+      // Initial load consumes one slot; execute the remaining 19 queries.
+      for (let i = 0; i < 19; i++) {
         fireEvent.click(queryButton);
         await waitFor(() => {
           expect(insightsApi.getDistributions).toHaveBeenCalledTimes(i + 2); // +1 for initial load
@@ -314,14 +314,9 @@ describe('Insights Page', () => {
         expect(queryButton).toBeDisabled();
       });
 
-      // Try to query again - should be blocked
+      // A disabled control prevents another request; the budget notice remains visible.
       fireEvent.click(queryButton);
-
-      await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith(
-          expect.stringContaining('Query budget exceeded')
-        );
-      });
+      expect(insightsApi.getDistributions).toHaveBeenCalledTimes(20);
     });
 
     it('displays inference defense notice when suppressions occur', async () => {

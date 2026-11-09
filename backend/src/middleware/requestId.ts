@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Request ID middleware
@@ -7,8 +7,13 @@ import { v4 as uuidv4 } from 'uuid';
  * Also propagates it in X-Request-ID header
  */
 export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Use existing request ID from client if present, otherwise generate new
-  const requestId = (req.headers['x-request-id'] as string) || uuidv4();
+  // Accept only a bounded UUID supplied by a trusted caller. Arbitrary values
+  // would otherwise become attacker-controlled log/audit identifiers.
+  const supplied = req.headers['x-request-id'];
+  const requestId = typeof supplied === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied)
+    ? supplied
+    : randomUUID();
   
   // Attach to request object
   (req as any).id = requestId;

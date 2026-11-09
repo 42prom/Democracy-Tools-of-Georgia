@@ -1,1 +1,6 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+// This restriction applies to simulators only; physical iOS devices use arm64.
+// It must follow Generated.xcconfig to preserve the ML Kit slice restriction.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = $(inherited) arm64
+APP_ATTEST_ENVIRONMENT=production

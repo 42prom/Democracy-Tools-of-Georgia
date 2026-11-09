@@ -21,8 +21,14 @@ import 'screens/dashboard/dashboard_screen.dart';
 /// - Notifications (Firebase)
 /// - Storage (Secure Storage)
 /// - Enrollment checks
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await StorageService().purgeLegacyVotingSecrets();
+  } catch (error) {
+    debugPrint('Legacy voting-secret cleanup failed: $error');
+  }
 
   // Setup logging
   Logger.root.level = Level.ALL;

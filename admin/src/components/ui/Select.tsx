@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { SelectHTMLAttributes, forwardRef } from 'react';
+import { SelectHTMLAttributes, forwardRef, useId } from 'react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -9,15 +9,22 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, className, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = props.id ?? generatedId;
+    const errorId = error ? `${selectId}-error` : undefined;
+
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor={selectId} className="block text-sm font-medium text-gray-700 mb-1.5">
             {label}
           </label>
         )}
         <select
+          id={selectId}
           ref={ref}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={errorId}
           className={clsx(
             'w-full px-3 py-2 border rounded-lg text-sm transition-colors',
             'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
@@ -35,7 +42,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+        {error && <p id={errorId} className="mt-1.5 text-sm text-red-600">{error}</p>}
       </div>
     );
   }

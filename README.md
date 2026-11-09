@@ -80,7 +80,8 @@ sequenceDiagram
     Bio-->>Backend: Success (Hashed Identity)
 
     Note over Voter, DB: 2. Anonymous Voting
-    Voter->>Backend: Submit Encrypted Vote + Nullifier
+    Voter->>Backend: Submit payload-bound hardware attestation + vote
+    Backend->>Backend: Compute server-only HMAC nullifier
     Backend->>DB: Check Nullifier (One-Person-One-Vote)
     Backend->>DB: Store Vote in Hash Chain (Voter Id Separated)
 
@@ -97,6 +98,18 @@ sequenceDiagram
 4.  **Ed25519 Signed Receipts**: Voters receive a cryptographically signed ballot receipt. Anyone can independently verify it using the server's public key via `GET /api/v1/public/receipt-pubkey`.
 5.  **Blockchain Anchoring**: Periodic snapshots of each poll's Merkle root are anchored to a public blockchain (Ethereum/Polygon). Even database administrators cannot modify finalized results unnoticed.
 6.  **Immutable Audit Log**: All security-critical events are written to a chained-hash log (`audit_log`). Any row modification, deletion, or insertion breaks the chain and is detected by the verification script.
+
+### Mobile integrity release gates
+
+Current implementation evidence and remaining production gates are documented
+in [`docs/SELL_READY_STATUS.md`](docs/SELL_READY_STATUS.md) and
+[`docs/ADMIN_CONTROL_PLANE_RELEASE_GATES.md`](docs/ADMIN_CONTROL_PLANE_RELEASE_GATES.md).
+
+- Android voting uses the Play Integrity **Standard API**. Release builds require the public numeric Google Cloud project number through `PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER` (environment variable or Gradle `-P` property). The backend accepts Standard `requestHash` binding in production and rejects Classic tokens.
+- The Android request hash is the SHA-256 digest of the nonce, poll, selected option or canonical survey responses, and timestamp bucket. Ballot contents are never sent to Google in plaintext.
+- Apple DeviceCheck tokens are intentionally insufficient to authorize voting because they are not bound to the request. iOS production release remains blocked until the full App Attest key-attestation and per-vote assertion verifier is implemented and tested on physical devices.
+- Production-like staging runs with `NODE_ENV=production`, so missing secrets, signing keys, attestation credentials, unsafe CORS, or weak anonymity settings stop startup instead of silently weakening policy.
+- The measurable Android/iOS test matrix and release-blocking criteria are documented in [`docs/MOBILE_RELEASE_GATES.md`](docs/MOBILE_RELEASE_GATES.md).
 
 ---
 
@@ -191,13 +204,32 @@ graph TD
     cd Democracy-Tools-of-Georgia
     ```
 
-2.  **Start Infrastructure (Postgres, Redis)**
+2.  **Configure the local environment**
 
     ```bash
-    docker-compose up -d postgres redis biometric-service dtg-shield-service
+    cp .env.example .env
+    # Replace every CHANGE_ME value and reserve unique DTG project names/port blocks.
     ```
 
-3.  **Setup & Run Backend**
+3.  **Validate local Docker isolation**
+
+    Keep unique `DTG_*_PROJECT_NAME` values and port blocks in `.env`. Avoid the
+    global `COMPOSE_PROJECT_NAME`, because it overrides local, staging, and
+    production Compose files alike. The preflight is
+    read-only: it rejects ports owned by another Compose project, non-loopback
+    publishing, duplicate ports, and critically low disk space.
+
+    ```powershell
+    .\scripts\docker-preflight.ps1
+    ```
+
+4.  **Start the full local stack**
+
+    ```bash
+    docker compose up -d --build
+    ```
+
+5.  **Setup & Run Backend standalone (optional)**
     Copy the example environment file and generate secure secrets (see `.env.example` for instructions):
 
     ```bash
@@ -209,7 +241,7 @@ graph TD
     npm run dev
     ```
 
-4.  **Setup & Run Admin Panel**
+6.  **Setup & Run Admin Panel standalone (optional)**
 
     ```bash
     cd admin
@@ -218,7 +250,7 @@ graph TD
     npm run dev
     ```
 
-5.  **Run Biometric Service (Optional/Standalone)**
+7.  **Run Biometric Service (Optional/Standalone)**
 
     ```bash
     cd biometric-service
@@ -226,7 +258,7 @@ graph TD
     python main.py     # Runs on port 8000
     ```
 
-6.  **Run Mobile App**
+8.  **Run Mobile App**
     ```bash
     cd mobile
     flutter pub get

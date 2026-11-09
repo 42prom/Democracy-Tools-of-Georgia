@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 /// Custom scanning progress indicator with filling animation
 /// Shows a pulsating circle that fills with green color
 class ScanningProgressIndicator extends StatefulWidget {
-  const ScanningProgressIndicator({
-    super.key,
-    this.size = 120.0,
-  });
+  const ScanningProgressIndicator({super.key, this.size = 120.0});
 
   final double size;
 
@@ -29,19 +26,15 @@ class _ScanningProgressIndicatorState extends State<ScanningProgressIndicator>
       vsync: this,
     )..repeat(reverse: false);
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
-    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -70,7 +63,9 @@ class _ScanningProgressIndicatorState extends State<ScanningProgressIndicator>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.green.withValues(alpha: _opacityAnimation.value * 0.5),
+                      color: Colors.green.withValues(
+                        alpha: _opacityAnimation.value * 0.5,
+                      ),
                       width: 3,
                     ),
                   ),
@@ -79,9 +74,7 @@ class _ScanningProgressIndicatorState extends State<ScanningProgressIndicator>
               // Inner filling circle
               CustomPaint(
                 size: Size(widget.size * 0.7, widget.size * 0.7),
-                painter: _FillingCirclePainter(
-                  progress: _controller.value,
-                ),
+                painter: _FillingCirclePainter(progress: _controller.value),
               ),
               // Center icon
               Icon(
@@ -124,7 +117,8 @@ class _FillingCirclePainter extends CustomPainter {
     );
 
     // Clip to circle shape
-    final clipPath = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
+    final clipPath = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius));
     canvas.clipPath(clipPath);
 
     // Draw filling gradient
@@ -132,10 +126,7 @@ class _FillingCirclePainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
-        colors: [
-          Colors.green.shade700,
-          Colors.green.shade400,
-        ],
+        colors: [Colors.green.shade700, Colors.green.shade400],
       ).createShader(fillRect);
 
     canvas.drawRect(fillRect, fillPaint);

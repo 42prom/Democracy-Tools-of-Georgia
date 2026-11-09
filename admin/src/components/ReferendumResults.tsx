@@ -211,7 +211,7 @@ export default function ReferendumResults({ results, referendumQuestion, thresho
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value?: number) => [(value ?? 0).toLocaleString(), 'Votes']}
+                  formatter={(value) => [Number(value ?? 0).toLocaleString(), 'Votes']}
                 />
               </PieChart>
             </ResponsiveContainer>

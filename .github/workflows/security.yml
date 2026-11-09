@@ -1,0 +1,184 @@
+name: Security Gates
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "31 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  SEMGREP_IMAGE: semgrep/semgrep:1.176.0@sha256:12672acdb0949e19f9f6a4c2b288edd0b404f268f0ca7738a2c06f372f50362e
+  TRIVY_IMAGE: aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+  SYFT_IMAGE: anchore/syft:v1.51.1@sha256:95fe0835e5bebc6f8b1f8acef68d47d63d594ef4c0f25c097ff853b23cbac74c
+  ZAP_IMAGE: zaproxy/zap-stable:2.17.0@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+
+jobs:
+  secrets:
+    name: Full-history secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect committed credentials
+        run: >-
+          docker run --rm
+          -v "$PWD:/repo"
+          "$GITLEAKS_IMAGE"
+          detect --source=/repo --config=/repo/.gitleaks.toml
+          --gitleaks-ignore-path=/repo/.gitleaksignore --redact --verbose
+
+  sast-and-filesystem:
+    name: SAST, vulnerabilities, secrets, and misconfiguration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Semgrep security rules
+        run: >-
+          docker run --rm
+          -v "$PWD:/src"
+          -w /src
+          "$SEMGREP_IMAGE"
+          semgrep scan --error --metrics=off
+          --exclude=.local --exclude=build --exclude=dist --exclude=node_modules
+          --config=p/security-audit --config=p/owasp-top-ten .
+  filesystem:
+    name: Trivy repository dependencies and configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Trivy repository gate
+        run: >-
+          docker run --rm
+          -v "$PWD:/src"
+          "$TRIVY_IMAGE"
+          fs --scanners vuln,secret,misconfig
+          --severity HIGH,CRITICAL --exit-code 1
+          --skip-dirs /src/.local --skip-dirs /src/mobile/build
+          --skip-dirs /src/backend/node_modules --skip-dirs /src/admin/node_modules
+          /src
+
+  sbom:
+    name: CycloneDX source SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Generate repository SBOM
+        run: |
+          mkdir -p security-artifacts
+          docker run --rm -v "$PWD:/src" "$SYFT_IMAGE" \
+            dir:/src -o cyclonedx-json=/src/security-artifacts/repository.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: repository-cyclonedx-sbom
+          path: security-artifacts/repository.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+  container-images:
+    name: Container gate (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+          - name: admin
+            context: admin
+          - name: biometric
+            context: biometric-service
+          - name: shield
+            context: dtg-shield-service
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build immutable scan target
+        run: docker build --pull=false -t "dtg-${{ matrix.name }}-security:${{ github.sha }}" "${{ matrix.context }}"
+      - name: Scan final image
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          "$TRIVY_IMAGE"
+          image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed
+          "dtg-${{ matrix.name }}-security:${{ github.sha }}"
+      - name: Generate image SBOM
+        run: |
+          mkdir -p security-artifacts
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/security-artifacts:/out" "$SYFT_IMAGE" \
+            "dtg-${{ matrix.name }}-security:${{ github.sha }}" \
+            -o "cyclonedx-json=/out/${{ matrix.name }}.cdx.json"
+      - name: Upload image SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.name }}-image-cyclonedx-sbom
+          path: security-artifacts/${{ matrix.name }}.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+  admin-dast:
+    name: Isolated admin DAST baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and scan without host ports
+        shell: bash
+        run: |
+          set -euo pipefail
+          network="dtg-security-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          container="dtg-admin-dast-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup() {
+            docker rm -f "$container" >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mkdir -p security-artifacts
+          cp .zap/rules.tsv security-artifacts/rules.tsv
+          # ZAP runs as uid 1000; give it ownership of only its report directory.
+          sudo chown 1000:1000 security-artifacts
+          docker build --pull=false -t "dtg-admin-dast:${GITHUB_SHA}" admin
+          docker network create "$network"
+          docker run -d --name "$container" --network "$network" "dtg-admin-dast:${GITHUB_SHA}"
+          for attempt in $(seq 1 30); do
+            if docker exec "$container" wget -q --spider http://127.0.0.1:8080/; then break; fi
+            sleep 1
+          done
+          docker exec "$container" wget -q --spider http://127.0.0.1:8080/
+          # Cacheability scanner 10049 reports correct no-store responses too.
+          # Enforce the security property against the running server explicitly.
+          for path in / /index.html /login; do
+            headers="$(docker exec "$container" wget -S --spider "http://127.0.0.1:8080${path}" 2>&1)"
+            echo "$headers" | grep -Eiq 'Cache-Control:[[:space:]]*no-store'
+          done
+          docker run --rm --network "$network" \
+            -v "$PWD/security-artifacts:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap-baseline.py -t "http://${container}:8080" \
+            -c /zap/wrk/rules.tsv -r admin-zap.html -J admin-zap.json
+      - name: Upload DAST evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: admin-zap-baseline
+          path: |
+            security-artifacts/admin-zap.html
+            security-artifacts/admin-zap.json
+          if-no-files-found: warn
+          retention-days: 30

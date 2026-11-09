@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -65,6 +64,24 @@ class StorageService {
     await _secure.saveUserId(userId);
   }
 
+  /// Returns a cryptographically random, non-PII identifier for this install.
+  /// It replaces the previous wallet-address device identifier.
+  Future<String> getOrCreateInstallationId() async {
+    var installationId = await _secure.getInstallationId();
+    if (installationId != null && installationId.isNotEmpty) {
+      return installationId;
+    }
+
+    final random = Random.secure();
+    final bytes = Uint8List(32);
+    for (var index = 0; index < bytes.length; index++) {
+      bytes[index] = random.nextInt(256);
+    }
+    installationId = base64UrlEncode(bytes);
+    await _secure.saveInstallationId(installationId);
+    return installationId;
+  }
+
   // --- Non-sensitive: display name (SharedPreferences) ---
 
   Future<String?> getFirstName() async {
@@ -123,35 +140,9 @@ class StorageService {
     return 'Citizen';
   }
 
-  // --- Sensitive: credential secret (Secure Storage) ---
-
-  /// Get or generate credential secret for nullifier computation.
-  /// This secret NEVER leaves the device.
-  Future<String> getCredentialSecret() async {
-    String? secret = await _secure.getCredentialSecret();
-
-    if (secret == null || secret.isEmpty) {
-      // Generate cryptographically strong random secret
-      final rnd = Random.secure();
-      final bytes = Uint8List(32);
-      for (int i = 0; i < bytes.length; i++) {
-        bytes[i] = rnd.nextInt(256);
-      }
-      secret = base64UrlEncode(bytes);
-      await _secure.saveCredentialSecret(secret);
-    }
-
-    return secret;
-  }
-
-  /// Compute nullifier locally (NEVER sent to server)
-  /// nullifier = SHA256(pollId + credentialSecret)
-  Future<String> computeNullifier(String pollId) async {
-    final secret = await getCredentialSecret();
-    final input = '$pollId:$secret';
-    final bytes = utf8.encode(input);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
+  /// One-time upgrade cleanup for obsolete client-nullifier key material.
+  Future<void> purgeLegacyVotingSecrets() async {
+    await _secure.deleteLegacyCredentialSecret();
   }
 
   // --- Non-sensitive: activity history (SharedPreferences) ---

@@ -145,16 +145,12 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     if (widget.policy.nfc.requireNfc &&
         (widget.enrollmentSessionId == null ||
             widget.enrollmentSessionId!.isEmpty)) {
-      setState(
-        () => _error = loc.translate('session_missing_error'),
-      );
+      setState(() => _error = loc.translate('session_missing_error'));
       return;
     }
     if (widget.policy.documentScanner.requireDocumentPhotoScan &&
         _docPortraitBase64 == null) {
-      setState(
-        () => _error = loc.translate('document_photo_required'),
-      );
+      setState(() => _error = loc.translate('document_photo_required'));
       return;
     }
 
@@ -242,7 +238,8 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         loc.translate('policy'),
@@ -252,7 +249,10 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        widget.policy.documentScanner.strictness ==
+                                        widget
+                                                    .policy
+                                                    .documentScanner
+                                                    .strictness ==
                                                 'strict'
                                             ? loc.translate('strict_match')
                                             : loc.translate('lenient_match'),
@@ -279,12 +279,29 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                             _pnController,
                             TextInputType.number,
                           ),
-                          _buildEditableField(loc.translate('first_name'), _firstNameController),
-                          _buildEditableField(loc.translate('last_name'), _lastNameController),
-                          _buildEditableField(loc.translate('document_number'), _docNumController),
+                          _buildEditableField(
+                            loc.translate('first_name'),
+                            _firstNameController,
+                          ),
+                          _buildEditableField(
+                            loc.translate('last_name'),
+                            _lastNameController,
+                          ),
+                          _buildEditableField(
+                            loc.translate('document_number'),
+                            _docNumController,
+                          ),
 
-                          _buildDateField(loc.translate('date_of_birth'), _dobController, true),
-                          _buildDateField(loc.translate('expiry_date'), _expiryController, false),
+                          _buildDateField(
+                            loc.translate('date_of_birth'),
+                            _dobController,
+                            true,
+                          ),
+                          _buildDateField(
+                            loc.translate('expiry_date'),
+                            _expiryController,
+                            false,
+                          ),
 
                           const SizedBox(height: 24),
 
@@ -316,7 +333,9 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                                 color: Colors.black.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: cs.outlineVariant.withValues(alpha: 0.6),
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.6,
+                                  ),
                                 ),
                               ),
                               clipBehavior: Clip.antiAlias,

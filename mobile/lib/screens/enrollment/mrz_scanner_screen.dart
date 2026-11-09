@@ -239,8 +239,14 @@ class _MrzScannerScreenState extends State<MrzScannerScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildSwitchOption(DocumentType.passport, loc.translate('passport')),
-                            _buildSwitchOption(DocumentType.idCard, loc.translate('id_card')),
+                            _buildSwitchOption(
+                              DocumentType.passport,
+                              loc.translate('passport'),
+                            ),
+                            _buildSwitchOption(
+                              DocumentType.idCard,
+                              loc.translate('id_card'),
+                            ),
                           ],
                         ),
                       ),
@@ -523,7 +529,9 @@ class _MrzScannerScreenState extends State<MrzScannerScreen>
     final rawLines = _flattenRawLines(text);
 
     // Early exit: skip if no lines are close to MRZ length (30 for TD1, 44 for TD3)
-    final hasPotentialMrz = rawLines.any((l) => l.length >= 28 && l.length <= 46);
+    final hasPotentialMrz = rawLines.any(
+      (l) => l.length >= 28 && l.length <= 46,
+    );
     if (!hasPotentialMrz) return null;
 
     // TD3 (Passport) - 2 lines, 44 chars

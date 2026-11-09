@@ -9,6 +9,7 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
@@ -18,11 +19,10 @@ export default function Login({ onLogin }: LoginProps) {
 
     // Real authentication
     try {
-      const response = await authApi.login({ email, password })
+      const response = await authApi.login({ email, password, totpCode })
       
-      localStorage.setItem('adminToken', response.token)
-      localStorage.setItem('admin_token', response.token)
-      localStorage.setItem('adminUser', JSON.stringify(response.user))
+      sessionStorage.setItem('admin_csrf', response.csrfToken)
+      sessionStorage.setItem('admin_user', JSON.stringify(response.user))
       
       onLogin()
       navigate('/')
@@ -40,7 +40,7 @@ export default function Login({ onLogin }: LoginProps) {
             DTG Admin
           </h2>
           <p className="mt-2 text-center text-sm text-gray-400">
-            Phase 0 - Mock Authentication
+            Secure administrative access
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -63,6 +63,24 @@ export default function Login({ onLogin }: LoginProps) {
                 placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="totpCode" className="block text-sm font-medium text-gray-300">
+                Authenticator code
+              </label>
+              <input
+                id="totpCode"
+                name="totpCode"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                autoComplete="one-time-code"
+                className="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-facebook-blue focus:border-transparent"
+                placeholder="123456"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               />
             </div>
             <div>

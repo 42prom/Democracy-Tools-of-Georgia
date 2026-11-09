@@ -77,7 +77,8 @@ class _SendScreenState extends State<SendScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '${loc.translate('insufficient_balance')}. $currentBalance DTG'),
+              '${loc.translate('insufficient_balance')}. $currentBalance DTG',
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -98,8 +99,9 @@ class _SendScreenState extends State<SendScreen> {
         builder: (context, loc, child) {
           return AlertDialog(
             backgroundColor: const Color(0xFF2C2C2C),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Text(loc.translate('confirm_transaction')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -117,19 +119,25 @@ class _SendScreenState extends State<SendScreen> {
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline,
-                          color: Colors.orange, size: 18),
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.orange,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           loc.translate('action_cannot_undone'),
                           style: const TextStyle(
-                              color: Colors.orange, fontSize: 13),
+                            color: Colors.orange,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -253,9 +261,9 @@ class _SendScreenState extends State<SendScreen> {
                                 width: 64,
                                 height: 64,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .primaryColor
-                                      .withValues(alpha: 0.15),
+                                  color: Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -267,17 +275,13 @@ class _SendScreenState extends State<SendScreen> {
                               const SizedBox(height: 12),
                               Text(
                                 loc.translate('scan_qr_code'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
+                                style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 loc.translate('scan_recipient_qr'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
+                                style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: Colors.grey),
                               ),
                             ],
@@ -334,12 +338,15 @@ class _SendScreenState extends State<SendScreen> {
                     // Token Selector
                     DropdownButtonFormField<String>(
                       initialValue: _selectedToken,
-                      decoration:
-                          InputDecoration(labelText: loc.translate('token')),
+                      decoration: InputDecoration(
+                        labelText: loc.translate('token'),
+                      ),
                       dropdownColor: const Color(0xFF2C2C2C),
                       items: _availableTokens.map((token) {
                         return DropdownMenuItem(
-                            value: token, child: Text(token));
+                          value: token,
+                          child: Text(token),
+                        );
                       }).toList(),
                       onChanged: (value) {
                         setState(() {
@@ -389,16 +396,19 @@ class _SendScreenState extends State<SendScreen> {
                           ? const SizedBox(
                               width: 24,
                               height: 24,
-                              child:
-                                  CircularProgressIndicator(color: Colors.white),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
                             )
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Icon(Icons.send_rounded),
                                 const SizedBox(width: 8),
-                                Text(loc.translate('send'),
-                                    style: const TextStyle(fontSize: 16)),
+                                Text(
+                                  loc.translate('send'),
+                                  style: const TextStyle(fontSize: 16),
+                                ),
                               ],
                             ),
                     ),
@@ -426,7 +436,9 @@ class _SendScreenState extends State<SendScreen> {
                             child: Text(
                               loc.translate('double_check_address'),
                               style: const TextStyle(
-                                  fontSize: 12, color: Colors.orange),
+                                fontSize: 12,
+                                color: Colors.orange,
+                              ),
                             ),
                           ),
                         ],

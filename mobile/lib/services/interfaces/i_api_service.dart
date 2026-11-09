@@ -21,14 +21,12 @@ abstract class IApiService {
   Future<Map<String, dynamic>> submitVote({
     required String pollId,
     required String optionId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
   });
 
   Future<Map<String, dynamic>> submitSurvey({
     required String pollId,
-    required String nullifier,
     required String attestation,
     required int timestampBucket,
     required List<Map<String, dynamic>> responses,

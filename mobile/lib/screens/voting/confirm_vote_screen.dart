@@ -73,21 +73,17 @@ class _ConfirmVoteScreenState extends State<ConfirmVoteScreen> {
       );
       final String attestation = attestationResponse['attestation'];
 
-      // STEP 4: Compute nullifier locally (NEVER leaves device)
-      // nullifier = SHA256(pollId + credentialSecret)
-      setState(() => _statusMessage = loc.translate('step_4_5_nullifier'));
-      final String nullifier = await _storageService.computeNullifier(
-        widget.poll.id,
-      );
+      // STEP 4: Prepare the anonymous submission. The backend derives the
+      // double-vote nullifier from authenticated server-side material.
+      setState(() => _statusMessage = loc.translate('step_4_5_privacy'));
 
       // STEP 5: Submit vote
-      // POST /api/v1/votes
-      // NO userId, NO name, NO PII - only nullifier + attestation
+      // POST /api/v1/polls/:id/vote
+      // NO userId, name, PII, or client-generated pseudonymous identifier.
       setState(() => _statusMessage = loc.translate('step_5_5_submitting'));
       final response = await _apiService.submitVote(
         pollId: widget.poll.id,
         optionId: widget.selectedOption.id,
-        nullifier: nullifier,
         attestation: attestation,
         timestampBucket: timestampBucket,
       );

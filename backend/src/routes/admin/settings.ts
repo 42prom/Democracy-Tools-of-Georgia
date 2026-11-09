@@ -1,20 +1,18 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requireAdmin } from '../../middleware/auth';
-import { pool } from '../../db/client';
-import crypto from 'crypto';
+import { pool, transaction } from '../../db/client';
+import { decryptSensitiveValue, encryptSensitiveValue } from '../../services/secretEncryption';
+import {
+  isMaskedSecret,
+  validateAdminSettingsPatch,
+  validateFirebaseServiceAccount,
+} from '../../services/adminSettingsValidation';
+import { assertSafeBlockchainRpcUrl } from '../../services/outboundUrl';
 
 const router = Router();
 
 // All admin routes require authentication
 router.use(requireAdmin);
-
-import { getApiKeyEncryptionSecret } from '../../config/secrets';
-
-// Encryption key for API keys (in production, use a proper key management system)
-const ENCRYPTION_KEY = getApiKeyEncryptionSecret();
-
-// Derive a 32-byte key from the secret
-const DERIVED_KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
 
 function parseBool(value: any, defaultValue: boolean): boolean {
   if (value === undefined || value === null) return defaultValue;
@@ -32,28 +30,14 @@ function parseBool(value: any, defaultValue: boolean): boolean {
  * Encrypt API key for storage
  */
 function encryptApiKey(apiKey: string): string {
-  const iv = crypto.randomBytes(16); // Generate random IV
-  const cipher = crypto.createCipheriv('aes-256-cbc', DERIVED_KEY, iv);
-  let encrypted = cipher.update(apiKey, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  // Store IV with encrypted data (IV:encrypted)
-  return iv.toString('hex') + ':' + encrypted;
+  return encryptSensitiveValue(apiKey);
 }
 
 /**
  * Decrypt API key from storage
  */
 function decryptApiKey(encryptedKey: string): string {
-  const parts = encryptedKey.split(':');
-  if (parts.length !== 2) {
-    throw new Error('Invalid encrypted key format');
-  }
-  const iv = Buffer.from(parts[0], 'hex');
-  const encryptedText = parts[1];
-  const decipher = crypto.createDecipheriv('aes-256-cbc', DERIVED_KEY, iv);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  return decryptSensitiveValue(encryptedKey);
 }
 
 /**
@@ -263,8 +247,6 @@ export async function loadFullConfig(): Promise<any> {
         console.error('[Settings] Failed to decrypt push_service_account_json.');
         config.push.serviceAccountJson = '[Decryption Failed]';
       }
-    } else if (key === 'push_service_account_path') {
-      config.push.serviceAccountPath = value || '';
     }
   });
 
@@ -306,7 +288,11 @@ export async function getSecuritySettings() {
     } else if (key === 'security_vpn_detection_provider') {
       security.vpnDetectionProvider = value || 'iphub';
     } else if (key === 'security_vpn_detection_apikey') {
-      security.vpnDetectionApiKey = value || '';
+      try {
+        security.vpnDetectionApiKey = value ? decryptApiKey(value) : '';
+      } catch {
+        security.vpnDetectionApiKey = '';
+      }
     } else if (key === 'security_max_biometric_attempts_per_ip') {
       security.maxBiometricAttemptsPerIP = parseInt(value, 10) || 10;
     } else if (key === 'security_biometric_ip_limit_window_minutes') {
@@ -337,6 +323,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body || {};
+    await validateAdminSettingsPatch(body);
     const current = await loadFullConfig();
 
     const merged = {
@@ -412,10 +399,6 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
         value: merged.security.vpnDetectionProvider || 'iphub',
       },
       {
-        key: 'security_vpn_detection_apikey',
-        value: merged.security.vpnDetectionApiKey ? encryptApiKey(merged.security.vpnDetectionApiKey) : '',
-      },
-      {
         key: 'security_max_biometric_attempts_per_ip',
         value: String(merged.security.maxBiometricAttemptsPerIP),
       },
@@ -427,13 +410,25 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
       { key: 'push_enabled_global', value: String(merged.push.enabledGlobal) },
       { key: 'push_enabled_polls', value: String(merged.push.enabledPolls) },
       { key: 'push_enabled_messages', value: String(merged.push.enabledMessages) },
-      { key: 'push_service_account_path', value: merged.push.serviceAccountPath || '' },
     ];
+
+    if (
+      body.security &&
+      Object.prototype.hasOwnProperty.call(body.security, 'vpnDetectionApiKey') &&
+      !isMaskedSecret(body.security.vpnDetectionApiKey)
+    ) {
+      settings.push({
+        key: 'security_vpn_detection_apikey',
+        value: body.security.vpnDetectionApiKey
+          ? encryptApiKey(body.security.vpnDetectionApiKey)
+          : '',
+      });
+    }
 
     if (
       merged.documentScanner.apiKey &&
       typeof merged.documentScanner.apiKey === 'string' &&
-      !merged.documentScanner.apiKey.includes('•')
+      !isMaskedSecret(merged.documentScanner.apiKey)
     ) {
       settings.push({
         key: 'verification_document_apikey',
@@ -443,7 +438,7 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
     if (
       merged.liveness.apiKey &&
       typeof merged.liveness.apiKey === 'string' &&
-      !merged.liveness.apiKey.includes('•')
+      !isMaskedSecret(merged.liveness.apiKey)
     ) {
       settings.push({
         key: 'verification_liveness_apikey',
@@ -453,7 +448,7 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
     if (
       merged.faceMatch.apiKey &&
       typeof merged.faceMatch.apiKey === 'string' &&
-      !merged.faceMatch.apiKey.includes('•')
+      !isMaskedSecret(merged.faceMatch.apiKey)
     ) {
       settings.push({
         key: 'verification_facematch_apikey',
@@ -464,7 +459,7 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
     if (
       merged.push.serviceAccountJson &&
       typeof merged.push.serviceAccountJson === 'string' &&
-      !merged.push.serviceAccountJson.includes('•')
+      !isMaskedSecret(merged.push.serviceAccountJson)
     ) {
       settings.push({
         key: 'push_service_account_json',
@@ -472,17 +467,6 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
       });
     }
 
-    for (const setting of settings) {
-      await pool.query(
-        `INSERT INTO settings (key, value, updated_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (key)
-           DO UPDATE SET value = $2, updated_at = NOW()`,
-        [setting.key, setting.value]
-      );
-    }
-
-    // Update Rate Limits in system_settings
     const rateLimitSettings = [
       { key: 'rate_limit_enrollment', value: merged.rate_limit_enrollment },
       { key: 'rate_limit_login', value: merged.rate_limit_login },
@@ -490,16 +474,29 @@ router.patch('/', async (req: Request, res: Response, next: NextFunction) => {
       { key: 'rate_limit_vote', value: merged.rate_limit_vote },
     ];
 
-    for (const setting of rateLimitSettings) {
-      if (!setting.value) continue;
-      await pool.query(
-        `INSERT INTO system_settings (key, value, updated_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (key)
-           DO UPDATE SET value = $2, updated_at = NOW()`,
-        [setting.key, setting.value]
-      );
-    }
+    // These values form one security-policy snapshot: commit all changes or none.
+    await transaction(async client => {
+      for (const setting of settings) {
+        await client.query(
+          `INSERT INTO settings (key, value, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (key)
+             DO UPDATE SET value = $2, updated_at = NOW()`,
+          [setting.key, setting.value]
+        );
+      }
+
+      for (const setting of rateLimitSettings) {
+        if (!setting.value) continue;
+        await client.query(
+          `INSERT INTO system_settings (key, value, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (key)
+             DO UPDATE SET value = $2, updated_at = NOW()`,
+          [setting.key, setting.value]
+        );
+      }
+    });
 
     // Trigger push service reinitialization to apply new credentials/toggles
     const { pushService } = await import('../../services/pushNotifications');
@@ -601,6 +598,7 @@ router.get('/verification-providers', async (_req: Request, res: Response, next:
 router.post('/verification-providers', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { documentScanner, liveness, faceMatch } = req.body;
+    await validateAdminSettingsPatch({ documentScanner, liveness, faceMatch });
 
     // Prepare settings to upsert
     const settings = [
@@ -612,51 +610,52 @@ router.post('/verification-providers', async (req: Request, res: Response, next:
     ];
 
     // Only update API keys if they're not masked (i.e., user actually changed them)
-    if (documentScanner.apiKey && !documentScanner.apiKey.includes('•')) {
+    if (documentScanner.apiKey && !isMaskedSecret(documentScanner.apiKey)) {
       settings.push({
         key: 'verification_document_apikey',
         value: encryptApiKey(documentScanner.apiKey),
       });
     }
 
-    if (liveness.apiKey && !liveness.apiKey.includes('•')) {
+    if (liveness.apiKey && !isMaskedSecret(liveness.apiKey)) {
       settings.push({
         key: 'verification_liveness_apikey',
         value: encryptApiKey(liveness.apiKey),
       });
     }
 
-    if (faceMatch.apiKey && !faceMatch.apiKey.includes('•')) {
+    if (faceMatch.apiKey && !isMaskedSecret(faceMatch.apiKey)) {
       settings.push({
         key: 'verification_facematch_apikey',
         value: encryptApiKey(faceMatch.apiKey),
       });
     }
 
-    // Upsert all settings
-    for (const setting of settings) {
-      await pool.query(
-        `INSERT INTO settings (key, value, updated_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (key)
-           DO UPDATE SET value = $2, updated_at = NOW()`,
-        [setting.key, setting.value]
-      );
-    }
+    await transaction(async client => {
+      for (const setting of settings) {
+        await client.query(
+          `INSERT INTO settings (key, value, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (key)
+             DO UPDATE SET value = $2, updated_at = NOW()`,
+          [setting.key, setting.value]
+        );
+      }
+    });
 
     // Return updated config (with masked API keys)
     const updatedConfig = {
       documentScanner: {
         provider: documentScanner.provider,
         apiKey:
-          documentScanner.apiKey && !documentScanner.apiKey.includes('•')
+          documentScanner.apiKey && !isMaskedSecret(documentScanner.apiKey)
             ? maskApiKey(documentScanner.apiKey)
             : documentScanner.apiKey,
       },
       liveness: {
         provider: liveness.provider,
         apiKey:
-          liveness.apiKey && !liveness.apiKey.includes('•')
+          liveness.apiKey && !isMaskedSecret(liveness.apiKey)
             ? maskApiKey(liveness.apiKey)
             : liveness.apiKey,
         retryLimit: liveness.retryLimit,
@@ -664,7 +663,7 @@ router.post('/verification-providers', async (req: Request, res: Response, next:
       faceMatch: {
         provider: faceMatch.provider,
         apiKey:
-          faceMatch.apiKey && !faceMatch.apiKey.includes('•')
+          faceMatch.apiKey && !isMaskedSecret(faceMatch.apiKey)
             ? maskApiKey(faceMatch.apiKey)
             : faceMatch.apiKey,
         minScore: faceMatch.minScore,
@@ -709,7 +708,7 @@ router.post(
 
       // Remote provider stub: require API key.
       if (provider === 'provider') {
-        if (!apiKey || typeof apiKey !== 'string' || apiKey.includes('•')) {
+        if (!apiKey || typeof apiKey !== 'string' || isMaskedSecret(apiKey)) {
           return res.status(400).json({
             success: false,
             error: 'API key is required for this provider',
@@ -743,14 +742,14 @@ router.post(
  */
 router.post('/blockchain/test', async (req: Request, res: Response) => {
   try {
-    const { rpcUrl } = req.body;
+    const { rpcUrl } = req.body || {};
     if (!rpcUrl) {
       return res.status(400).json({ success: false, error: 'RPC URL is required' });
     }
 
-    // Import and use the real blockchain service
+    const safeRpcUrl = await assertSafeBlockchainRpcUrl(rpcUrl);
     const { BlockchainService } = await import('../../services/blockchain');
-    const result = await BlockchainService.testConnection(rpcUrl);
+    const result = await BlockchainService.testConnection(safeRpcUrl);
 
     if (result.success) {
       return res.json({
@@ -768,10 +767,9 @@ router.post('/blockchain/test', async (req: Request, res: Response) => {
       });
     }
   } catch (error: any) {
-    console.error('[Blockchain Test] Error:', error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      error: error.message || 'Failed to test blockchain connection',
+      error: error.message || 'RPC URL is not allowed',
     });
   }
 });
@@ -782,27 +780,29 @@ router.post('/blockchain/test', async (req: Request, res: Response) => {
  */
 router.post('/notifications/test', async (req: Request, res: Response) => {
   try {
-    const { serviceAccountJson, serviceAccountPath } = req.body;
+    const { serviceAccountJson, serviceAccountPath } = req.body || {};
 
     // This is a dry-run test. In a real scenario, we might try to list the project metadata.
     // For now, we validate the input.
-    if (!serviceAccountJson && !serviceAccountPath) {
+    if (serviceAccountPath) {
       return res.status(400).json({
         success: false,
-        error: 'Either Service Account JSON or Path is required',
+        error: 'Service Account Path is environment-only',
       });
     }
-
-    if (serviceAccountJson && !serviceAccountJson.includes('•')) {
-      try {
-        JSON.parse(serviceAccountJson);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid JSON format for Service Account',
-        });
-      }
+    if (!serviceAccountJson) {
+      return res.status(400).json({
+        success: false,
+        error: 'Service Account JSON is required',
+      });
     }
+    if (isMaskedSecret(serviceAccountJson)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Paste a fresh Service Account JSON value to validate it',
+      });
+    }
+    validateFirebaseServiceAccount(serviceAccountJson);
 
     // Simulate connection check
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -812,9 +812,9 @@ router.post('/notifications/test', async (req: Request, res: Response) => {
       message: 'Firebase configuration format is valid. (Token validation will occur on save)',
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      error: 'Failed to test Firebase connection',
+      error: error instanceof Error ? error.message : 'Invalid Firebase configuration',
     });
   }
 });

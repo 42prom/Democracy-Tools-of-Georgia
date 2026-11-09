@@ -9,7 +9,7 @@ process.env.CRYPTO_HASHER = 'hmac';
 process.env.RECEIPT_PRIVATE_KEY_PEM = '';
 process.env.RECEIPT_PUBLIC_KEY_PEM = '';
 
-process.env.PN_HASH_SECRET = 'test-pn-hash-secret';
-process.env.JWT_SECRET = 'test-jwt-secret';
-process.env.DATABASE_URL = 'postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci';
-process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.PN_HASH_SECRET ??= 'test-pn-hash-secret';
+process.env.JWT_SECRET ??= 'test-jwt-secret';
+process.env.DATABASE_URL ??= 'postgresql://dtg_user:dtg_ci_password@localhost:5432/dtg_ci';
+process.env.REDIS_URL ??= 'redis://localhost:6379/15';

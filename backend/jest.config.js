@@ -14,6 +14,7 @@ module.exports = {
     'tests/nonce.test.ts',
     'tests/health.test.ts',
     'tests/sanity.test.ts',
+    'tests/survey-voting.integration.test.ts',
   ],
   collectCoverageFrom: [
     'src/**/*.ts',

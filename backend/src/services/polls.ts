@@ -3,6 +3,7 @@ import { Poll, PollOption, CreatePollRequest, AudienceRules } from '../types/pol
 import { SurveyQuestion } from '../types/survey';
 import { pushService } from './pushNotifications';
 import { AppConfig } from '../config/app';
+import { createError } from '../middleware/errorHandler';
 
 /**
  * Create a new poll
@@ -243,23 +244,39 @@ export async function publishPoll(pollId: string): Promise<Poll> {
   console.log('[PollsService] Publishing poll:', pollId);
   return await transaction(async (client) => {
     try {
-      const pollRes = await client.query('SELECT * FROM polls WHERE id = $1', [pollId]);
+      const pollRes = await client.query('SELECT * FROM polls WHERE id = $1 FOR UPDATE', [pollId]);
       if (pollRes.rows.length === 0) {
         console.error('[PollsService] Poll not found for publishing:', pollId);
-        throw new Error('Poll not found');
+        throw createError('Poll not found', 404);
       }
 
       const poll = pollRes.rows[0] as Poll;
       console.log('[PollsService] Found poll for publishing:', poll.title, 'status:', poll.status);
+
+      if (poll.status !== 'draft') {
+        throw createError('Only a draft poll can be published', 409);
+      }
+      if (poll.end_at && new Date(poll.end_at).getTime() <= Date.now()) {
+        throw createError('A poll cannot be published after its end time', 409);
+      }
+
+      const contentResult = poll.type === 'survey'
+        ? await client.query('SELECT COUNT(*)::int AS count FROM survey_questions WHERE poll_id = $1', [pollId])
+        : await client.query('SELECT COUNT(*)::int AS count FROM poll_options WHERE poll_id = $1', [pollId]);
+      const minimumContent = poll.type === 'survey' ? 1 : 2;
+      if (Number(contentResult.rows[0]?.count || 0) < minimumContent) {
+        throw createError('Poll content is incomplete and cannot be published', 409);
+      }
 
       // Estimate audience (this one still uses the global pool for now, which is fine as it's READ only)
       const estimate = await estimateAudience(poll.audience_rules);
 
       const minK = AppConfig.MIN_K_ANONYMITY;
       if (!estimate.isPrivacySafe) {
-        // Warning only - admin can publish regardless, results will be suppressed until k-anonymity is met
-        console.warn('[PollsService] Small audience warning for poll:', pollId, 'estimate:', estimate.count, 'minK:', minK);
-        console.warn('[PollsService] Results will be suppressed until enough votes are collected');
+        throw createError(
+          `Audience estimate (${estimate.count}) is below the privacy threshold (${minK})`,
+          409
+        );
       }
 
       // Update status to active
@@ -280,7 +297,9 @@ export async function publishPoll(pollId: string): Promise<Poll> {
       console.log('[PollsService] Poll published successfully:', pollId);
       
       // Trigger notification (async, don't block)
-      pushService.notifyPollPublished(pollId, freshPoll.rows[0].title);
+      void pushService.notifyPollPublished(pollId, freshPoll.rows[0].title).catch(error => {
+        console.error('[PollsService] Publish notification failed:', error);
+      });
       
       return freshPoll.rows[0];
     } catch (err: any) {
@@ -433,15 +452,25 @@ export async function updatePoll(pollId: string, pollData: Partial<CreatePollReq
       // 1. Lock and fetch current poll
       const currentPollRes = await client.query('SELECT * FROM polls WHERE id = $1 FOR UPDATE', [pollId]);
       if (currentPollRes.rows.length === 0) {
-        throw new Error('Poll not found');
+        throw createError('Poll not found', 404);
       }
       const currentPoll = currentPollRes.rows[0];
+
+      if (currentPoll.status !== 'draft') {
+        throw createError('Published or closed polls are immutable', 409);
+      }
+
+      const nextStart = pollData.start_at === undefined ? currentPoll.start_at : pollData.start_at;
+      const nextEnd = pollData.end_at === undefined ? currentPoll.end_at : pollData.end_at;
+      if (nextStart && nextEnd && new Date(nextStart).getTime() >= new Date(nextEnd).getTime()) {
+        throw createError('end_at must be after start_at', 400);
+      }
 
       // 2. Update main polls table
       // options/questions are separate tables, not columns
       const ALLOWED_COLUMNS = [
-        'title', 'description', 'type', 'status', 'start_at', 'end_at', 
-        'audience_rules', 'min_k_anonymity', 'rewards_enabled', 
+        'title', 'description', 'type', 'start_at', 'end_at',
+        'audience_rules', 'rewards_enabled',
         'reward_amount', 'reward_token'
       ];
 
@@ -504,6 +533,7 @@ export async function updatePoll(pollId: string, pollData: Partial<CreatePollReq
       else if (pollData.options && Array.isArray(pollData.options)) {
         // Refresh flat options
         await client.query('DELETE FROM poll_options WHERE poll_id = $1', [pollId]);
+        await client.query('DELETE FROM survey_questions WHERE poll_id = $1', [pollId]);
         
         // Ensure options are strings
         for (let i = 0; i < pollData.options.length; i++) {

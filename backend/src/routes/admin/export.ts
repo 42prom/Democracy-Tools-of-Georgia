@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAdmin } from '../../middleware/auth';
+import { requireAdmin, requireAdminRole } from '../../middleware/auth';
 import { pool } from '../../db/client';
 import { AuditExportService } from '../../services/auditExport';
 
@@ -29,10 +29,83 @@ function escapeCsvField(field: any): string {
 /**
  * Helper function to format array as comma-separated string
  */
-function formatArray(arr: any[]): string {
-  if (!arr || arr.length === 0) return '';
-  return arr.join(';'); // Use semicolon to avoid CSV parsing issues
-}
+/**
+ * GET /api/v1/admin/export/users-aggregated.csv
+ * Export a k-anonymous demographic distribution with no row-level identifiers.
+ */
+router.get(
+  '/users-aggregated.csv',
+  requireAdminRole('superadmin', 'observer'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const minimumK = Number.parseInt(process.env.MIN_K_ANONYMITY || '30', 10);
+      if (!Number.isInteger(minimumK) || minimumK < 1) {
+        throw new Error('MIN_K_ANONYMITY is invalid');
+      }
+
+      const result = await pool.query(
+        `SELECT
+           CASE
+             WHEN credential_birth_year IS NULL THEN 'Unknown'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year BETWEEN 18 AND 24 THEN '18-24'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year BETWEEN 25 AND 34 THEN '25-34'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year BETWEEN 35 AND 44 THEN '35-44'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year BETWEEN 45 AND 54 THEN '45-54'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year BETWEEN 55 AND 64 THEN '55-64'
+             WHEN EXTRACT(YEAR FROM CURRENT_DATE)::int - credential_birth_year >= 65 THEN '65+'
+             ELSE 'Unknown'
+           END AS age_bucket,
+           COALESCE(NULLIF(credential_gender, ''), 'Unknown') AS gender_bucket,
+           COALESCE(credential_region_codes[1], 'Unknown') AS region_bucket,
+           COUNT(*)::int AS user_count
+         FROM users
+         GROUP BY age_bucket, gender_bucket, region_bucket
+         HAVING COUNT(*) >= $1
+         ORDER BY age_bucket, gender_bucket, region_bucket`,
+        [minimumK]
+      );
+
+      let csvContent = 'age_bucket,gender_bucket,region_bucket,user_count\n';
+      for (const row of result.rows) {
+        csvContent += [
+          escapeCsvField(row.age_bucket),
+          escapeCsvField(row.gender_bucket),
+          escapeCsvField(row.region_bucket),
+          escapeCsvField(row.user_count),
+        ].join(',') + '\n';
+      }
+
+      // Fail closed: the export is not released if its audit write fails.
+      await pool.query(
+        `INSERT INTO security_events
+         (event_type, result, user_id, ip_address, user_agent, meta, created_at)
+         VALUES ('audit_export', 'success', NULL, $1, $2, $3, NOW())`,
+        [
+          req.ip || null,
+          req.get('user-agent') || null,
+          JSON.stringify({
+            exportType: 'users_aggregated',
+            adminUserId: req.adminUser!.id,
+            adminEmail: req.adminUser!.email,
+            minimumK,
+            releasedBuckets: result.rows.length,
+          }),
+        ]
+      );
+
+      const filename = `DTG-users-aggregated-${new Date().toISOString().split('T')[0]}.csv`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('X-Privacy-Threshold', String(minimumK));
+      res.send(csvContent);
+    } catch (error) {
+      console.error('Failed to export aggregated users:', error);
+      next(error);
+    }
+  }
+);
 
 /**
  * GET /api/v1/admin/export/users.csv
@@ -45,70 +118,11 @@ function formatArray(arr: any[]): string {
  */
 router.get(
   '/users.csv',
-  async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      console.log('📊 Exporting users to CSV...');
-
-      // Query all users with relevant fields
-      const result = await pool.query(
-        `SELECT
-          id as user_id,
-          pn_hash,
-          credential_gender as gender,
-          credential_birth_year as birth_year,
-          credential_region_codes as region_codes,
-          trust_score,
-          created_at,
-          last_login_at
-         FROM users
-         ORDER BY created_at DESC`
-      );
-
-      // Build CSV content
-      const headers = [
-        'user_id',
-        'pn_hash',
-        'gender',
-        'birth_year',
-        'region_codes',
-        'trust_score',
-        'created_at',
-        'last_login_at',
-      ];
-
-      let csvContent = headers.join(',') + '\n';
-
-      // Add data rows
-      for (const row of result.rows) {
-        const values = [
-          escapeCsvField(row.user_id),
-          escapeCsvField(row.pn_hash),
-          escapeCsvField(row.gender),
-          escapeCsvField(row.birth_year),
-          escapeCsvField(formatArray(row.region_codes)),
-          escapeCsvField(row.trust_score),
-          escapeCsvField(row.created_at?.toISOString()),
-          escapeCsvField(row.last_login_at?.toISOString()),
-        ];
-
-        csvContent += values.join(',') + '\n';
-      }
-
-      // Set response headers for CSV download
-      const filename = `DTG-users-export-${new Date().toISOString().split('T')[0]}.csv`;
-
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Cache-Control', 'no-cache');
-
-      // Send CSV content
-      res.send(csvContent);
-
-      console.log(`✓ Exported ${result.rows.length} users to CSV`);
-    } catch (error) {
-      console.error('Failed to export users:', error);
-      next(error);
-    }
+  requireAdminRole('superadmin'),
+  (_req: Request, res: Response) => {
+    res.status(410).json({
+      error: 'Row-level profile export is disabled. Use /users-aggregated.csv.',
+    });
   }
 );
 
@@ -118,6 +132,7 @@ router.get(
  */
 router.get(
   '/security-events.csv',
+  requireAdminRole('superadmin'),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       console.log('📊 Exporting security events to CSV...');
@@ -192,8 +207,8 @@ router.get(
  * Export audit data for a completed poll
  *
  * Query Parameters:
- * - includeVoteLevelData: boolean (default: true)
- * - anonymizeVoters: boolean (default: false)
+ * - includeVoteLevelData: must remain false to protect ballot secrecy
+ * - anonymizeVoters: must remain true
  * - dateRangeStart: ISO date string (optional)
  * - dateRangeEnd: ISO date string (optional)
  *
@@ -205,12 +220,13 @@ router.get(
  */
 router.get(
   '/polls/:pollId/audit.csv',
+  requireAdminRole('superadmin', 'observer'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const pollId = req.params.pollId as string;
       const {
-        includeVoteLevelData = 'true',
-        anonymizeVoters = 'false',
+        includeVoteLevelData = 'false',
+        anonymizeVoters = 'true',
         dateRangeStart,
         dateRangeEnd,
       } = req.query;
@@ -283,6 +299,7 @@ router.get(
  */
 router.get(
   '/polls/:pollId/audit/preview',
+  requireAdminRole('superadmin', 'observer'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const pollId = req.params.pollId as string;
@@ -345,12 +362,14 @@ router.get(
         },
         exportOptions: {
           includeVoteLevelData: {
-            default: true,
-            description: 'Include individual vote records with anonymized demographics',
+            default: false,
+            available: false,
+            description: 'Disabled because timestamps and demographics can reveal ballot choices',
           },
           anonymizeVoters: {
-            default: false,
-            description: 'Replace vote IDs with sequential numbers (VOTE-000001)',
+            default: true,
+            required: true,
+            description: 'Voter identifiers are never included',
           },
           dateRange: {
             available: true,
@@ -371,12 +390,13 @@ router.get(
  */
 router.get(
   '/polls/:pollId/audit-stream.csv',
+  requireAdminRole('superadmin', 'observer'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const pollId = req.params.pollId as string;
       const {
-        includeVoteLevelData = 'true',
-        anonymizeVoters = 'false',
+        includeVoteLevelData = 'false',
+        anonymizeVoters = 'true',
         dateRangeStart,
         dateRangeEnd,
       } = req.query;
@@ -451,4 +471,3 @@ router.get(
 );
 
 export default router;
-

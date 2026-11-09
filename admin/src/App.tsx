@@ -1,56 +1,69 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-import Layout from './components/Layout';
-import SettingsLayout from './components/SettingsLayout';
-
 import Login from './pages/Login';
-import CreatePoll from './pages/CreatePoll';
-import DraftedPolls from './pages/DraftedPolls';
-import ActivePolls from './pages/ActivePolls';
-import VotingHistory from './pages/VotingHistory';
-import SettingsRegions from './pages/SettingsRegions';
-import SettingsVerificationProviders from './pages/SettingsVerificationProviders';
-import SettingsBlockchain from './pages/SettingsBlockchain';
-import SettingsSecurity from './pages/SettingsSecurity';
-import SettingsNotifications from './pages/SettingsNotifications';
-import SettingsGeoBlocking from './pages/SettingsGeoBlocking';
-import Dashboard from './pages/Dashboard';
-import SecurityLogs from './pages/SecurityLogs';
-import PollDetails from './pages/PollDetails';
-import Insights from './pages/Insights';
-import Profiles from './pages/Profiles';
-import MessagesList from './pages/MessagesList';
-import MessageEditor from './pages/MessageEditor';
-import Tickets from './pages/Tickets';
-import TicketDetail from './pages/TicketDetail';
-import ShieldDashboard from './pages/ShieldDashboard';
+import { authApi } from './api/client';
 
-function hasAdminToken() {
-  return !!(localStorage.getItem('admin_token') ?? localStorage.getItem('adminToken'));
-}
+const Layout = lazy(() => import('./components/Layout'));
+const SettingsLayout = lazy(() => import('./components/SettingsLayout'));
+const CreatePoll = lazy(() => import('./pages/CreatePoll'));
+const DraftedPolls = lazy(() => import('./pages/DraftedPolls'));
+const ActivePolls = lazy(() => import('./pages/ActivePolls'));
+const VotingHistory = lazy(() => import('./pages/VotingHistory'));
+const SettingsRegions = lazy(() => import('./pages/SettingsRegions'));
+const SettingsVerificationProviders = lazy(() => import('./pages/SettingsVerificationProviders'));
+const SettingsBlockchain = lazy(() => import('./pages/SettingsBlockchain'));
+const SettingsSecurity = lazy(() => import('./pages/SettingsSecurity'));
+const SettingsNotifications = lazy(() => import('./pages/SettingsNotifications'));
+const SettingsGeoBlocking = lazy(() => import('./pages/SettingsGeoBlocking'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const SecurityLogs = lazy(() => import('./pages/SecurityLogs'));
+const PollDetails = lazy(() => import('./pages/PollDetails'));
+const Insights = lazy(() => import('./pages/Insights'));
+const Profiles = lazy(() => import('./pages/Profiles'));
+const MessagesList = lazy(() => import('./pages/MessagesList'));
+const MessageEditor = lazy(() => import('./pages/MessageEditor'));
+const Tickets = lazy(() => import('./pages/Tickets'));
+const TicketDetail = lazy(() => import('./pages/TicketDetail'));
+const ShieldDashboard = lazy(() => import('./pages/ShieldDashboard'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 
-function RequireAdmin({ children, isAuthed }: { children: React.ReactNode; isAuthed: boolean }) {
-  if (!isAuthed) {
+type AuthStatus = 'checking' | 'authenticated' | 'guest';
+
+function RequireAdmin({ children, status }: { children: React.ReactNode; status: AuthStatus }) {
+  if (status === 'checking') {
+    return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Checking secure session…</div>;
+  }
+  if (status !== 'authenticated') {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }
 
 function App() {
-  const [isAuthed, setIsAuthed] = useState(hasAdminToken());
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+
+  useEffect(() => {
+    authApi.me()
+      .then(response => {
+        sessionStorage.setItem('admin_csrf', response.csrfToken);
+        sessionStorage.setItem('admin_user', JSON.stringify(response.user));
+        setAuthStatus('authenticated');
+      })
+      .catch(() => setAuthStatus('guest'));
+  }, []);
 
   return (
     <BrowserRouter>
-      <Routes>
+      <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading secure console…</div>}>
+        <Routes>
         {/* Login route */}
-        <Route path="/login" element={<Login onLogin={() => setIsAuthed(true)} />} />
+        <Route path="/login" element={<Login onLogin={() => setAuthStatus('authenticated')} />} />
 
         {/* Protected admin routes */}
         <Route
           path="/"
           element={
-            <RequireAdmin isAuthed={isAuthed}>
+            <RequireAdmin status={authStatus}>
               <Layout />
             </RequireAdmin>
           }
@@ -70,6 +83,7 @@ function App() {
           <Route path="messages/:id/edit" element={<MessageEditor />} />
           <Route path="logs" element={<SecurityLogs />} />
           <Route path="shield" element={<ShieldDashboard />} />
+          <Route path="admin-users" element={<AdminUsers />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
 
@@ -86,7 +100,8 @@ function App() {
 
         {/* fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

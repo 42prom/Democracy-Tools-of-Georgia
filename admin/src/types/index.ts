@@ -1,10 +1,11 @@
 export interface LoginRequest {
   email: string;
   password?: string;
+  totpCode?: string;
 }
 
 export interface AuthResponse {
-  token: string;
+  csrfToken: string;
   user: AdminUser;
 }
 
@@ -13,6 +14,21 @@ export interface AdminUser {
   email: string;
   role: 'superadmin' | 'admin' | 'moderator' | 'observer';
   fullName?: string;
+}
+
+export interface AdminAccount extends AdminUser {
+  isActive: boolean;
+  failedLoginAttempts: number;
+  lockedUntil?: string;
+  lastLoginAt?: string;
+  passwordChangedAt: string;
+  createdAt: string;
+  mfaEnabled: boolean;
+}
+
+export interface AdminMfaProvisioning {
+  mfaSecret: string;
+  mfaProvisioningUri: string;
 }
 
 export type PollStatus = 'draft' | 'scheduled' | 'active' | 'ended' | 'archived';

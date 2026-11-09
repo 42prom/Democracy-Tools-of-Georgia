@@ -1,0 +1,15 @@
+title = "DTG voting repository secret-scanning policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated, local-only, and test-fixture paths"
+paths = [
+  '''^\.local/''',
+  '''(^|/)build/''',
+  '''(^|/)dist/''',
+  '''(^|/)node_modules/''',
+  '''^mobile/ios/Pods/''',
+  '''^mobile/android/\.gradle/'''
+]

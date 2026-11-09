@@ -44,10 +44,7 @@ class MockFaceMatcher implements FaceMatcher {
   /// Minimum score for passing (0.0 to 1.0)
   final double passingThreshold;
 
-  MockFaceMatcher({
-    this.mockSuccessRate = 0.85,
-    this.passingThreshold = 0.75,
-  });
+  MockFaceMatcher({this.mockSuccessRate = 0.85, this.passingThreshold = 0.75});
 
   @override
   Future<FaceMatchResult> matchFaces(FaceMatchInput input) async {
@@ -79,7 +76,9 @@ class MockFaceMatcher implements FaceMatcher {
     return FaceMatchResult(
       passed: passed,
       score: score,
-      errorMessage: passed ? null : 'Face match failed - photos do not match sufficiently',
+      errorMessage: passed
+          ? null
+          : 'Face match failed - photos do not match sufficiently',
     );
   }
 
@@ -119,10 +118,7 @@ class AlwaysPassFaceMatcher implements FaceMatcher {
     // Quick simulation
     await Future.delayed(const Duration(milliseconds: 500));
 
-    return FaceMatchResult(
-      passed: true,
-      score: 0.92,
-    );
+    return FaceMatchResult(passed: true, score: 0.92);
   }
 
   @override
@@ -146,9 +142,7 @@ class AlwaysPassFaceMatcher implements FaceMatcher {
 class DeterministicFaceMatcher implements FaceMatcher {
   final double fixedScore;
 
-  DeterministicFaceMatcher({
-    this.fixedScore = 0.85,
-  });
+  DeterministicFaceMatcher({this.fixedScore = 0.85});
 
   @override
   Future<FaceMatchResult> matchFaces(FaceMatchInput input) async {
@@ -183,7 +177,8 @@ class MLFaceMatcher implements FaceMatcher {
   Future<FaceMatchResult> matchFaces(FaceMatchInput input) async {
     throw VerificationException(
       type: VerificationErrorType.unknownError,
-      message: 'ML face matching not yet implemented - use MockFaceMatcher for MVP',
+      message:
+          'ML face matching not yet implemented - use MockFaceMatcher for MVP',
     );
   }
 

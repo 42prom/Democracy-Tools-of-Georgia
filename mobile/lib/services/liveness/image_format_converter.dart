@@ -61,7 +61,9 @@ class ImageFormatConverter {
       _backoffUntil = DateTime.now().add(
         const Duration(milliseconds: _backoffDurationMs),
       );
-      debugPrint('[ImageFormat] Backoff triggered after $_consecutiveNullFrames failures');
+      debugPrint(
+        '[ImageFormat] Backoff triggered after $_consecutiveNullFrames failures',
+      );
       _consecutiveNullFrames = 0;
     }
   }
@@ -83,9 +85,11 @@ class ImageFormatConverter {
 
     for (int i = 0; i < image.planes.length; i++) {
       final plane = image.planes[i];
-      buffer.writeln('  plane[$i]: bytesPerRow=${plane.bytesPerRow}, '
-          'bytesPerPixel=${plane.bytesPerPixel ?? "null"}, '
-          'bytes=${plane.bytes.length}');
+      buffer.writeln(
+        '  plane[$i]: bytesPerRow=${plane.bytesPerRow}, '
+        'bytesPerPixel=${plane.bytesPerPixel ?? "null"}, '
+        'bytes=${plane.bytes.length}',
+      );
     }
 
     if (conversionPath != null) {
@@ -148,15 +152,18 @@ class ImageFormatConverter {
     // Throttle error logs
     final now = DateTime.now();
     if (_lastErrorLogTime != null &&
-        now.difference(_lastErrorLogTime!).inMilliseconds < _errorLogThrottleMs) {
+        now.difference(_lastErrorLogTime!).inMilliseconds <
+            _errorLogThrottleMs) {
       return;
     }
     _lastErrorLogTime = now;
     _warnedFormats.add(rawFormat);
 
-    debugPrint('[ImageFormat] Unsupported format: $rawFormat '
-        '(${_formatName(rawFormat)}), size: ${image.width}x${image.height}, '
-        'planes: ${image.planes.length}');
+    debugPrint(
+      '[ImageFormat] Unsupported format: $rawFormat '
+      '(${_formatName(rawFormat)}), size: ${image.width}x${image.height}, '
+      'planes: ${image.planes.length}',
+    );
   }
 
   /// Get human-readable format name

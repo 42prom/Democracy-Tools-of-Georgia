@@ -1,4 +1,5 @@
 import { CryptoRegistry } from '../crypto/CryptoRegistry';
+import { getSecret } from '../config/vault';
 
 /**
  * Nullifier Service — Phase 2
@@ -34,7 +35,7 @@ export async function computeNullifier(voterSub: string, pollId: string): Promis
  */
 export function computeNullifierSync(voterSub: string, pollId: string): string {
   const { createHmac } = require('crypto');
-  const secret = process.env.NULLIFIER_SECRET;
+  const secret = getSecret('NULLIFIER_SECRET');
   if (!secret) throw new Error('[Nullifier] NULLIFIER_SECRET not set');
   return createHmac('sha256', secret).update(`${voterSub}|${pollId}`).digest('hex');
 }

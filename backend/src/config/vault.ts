@@ -1,113 +1,180 @@
-/**
- * Vault Secrets Manager
- *
- * Provides a unified interface for reading secrets from:
- *   1. HashiCorp Vault (production) — when VAULT_ADDR and VAULT_TOKEN are set.
- *   2. Environment variables (.env) — development / Docker fallback.
- *
- * This is a progressive enhancement: the system works identically without Vault,
- * and Vault is transparently enabled when its env vars are present.
- *
- * HOW TO ENABLE VAULT:
- *   1. Run Vault (Docker): docker run --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=dtg-dev-token -p 8200:8200 vault:latest
- *   2. Set env vars: VAULT_ADDR=http://localhost:8200  VAULT_TOKEN=dtg-dev-token
- *   3. Write secrets:
- *        vault kv put secret/dtg \
- *          NULLIFIER_SECRET="..." \
- *          JWT_SECRET="..." \
- *          RECEIPT_PRIVATE_KEY_PEM="..." \
- *          BLOCKCHAIN_PRIVATE_KEY="..."
- *   4. The app reads from Vault automatically on startup.
- *
- * PRODUCTION VAULT (cloud):
- *   Use VAULT_ROLE_ID + VAULT_SECRET_ID for AppRole auth (no long-lived tokens).
- *   Or use AWS IAM / GCP Workload Identity via Vault's cloud auth methods.
- */
+import { readFile } from 'node:fs/promises';
 
-const VAULT_ADDR = process.env.VAULT_ADDR;
-const VAULT_TOKEN = process.env.VAULT_TOKEN;
-const VAULT_SECRET_PATH = process.env.VAULT_SECRET_PATH ?? 'secret/data/dtg';
+const DEFAULT_SECRET_PATH = 'secret/data/dtg';
+const MAX_TOKEN_BYTES = 8_192;
+const MAX_RESPONSE_BYTES = 1_048_576;
+const PRODUCTION_VAULT_SECRETS = [
+  'JWT_SECRET',
+  'PN_HASH_SECRET',
+  'API_KEY_ENCRYPTION_SECRET',
+  'DEVICE_HASH_SECRET',
+  'VOTER_HASH_SECRET',
+  'NULLIFIER_SECRET',
+  'RECEIPT_PRIVATE_KEY_PEM',
+  'RECEIPT_PUBLIC_KEY_PEM',
+  'METRICS_BEARER_TOKEN',
+  'AUDIT_CHECKPOINT_PRIVATE_KEY_PEM',
+  'AUDIT_CHECKPOINT_BEARER_TOKEN',
+] as const;
 
-/** In-memory cache of Vault secrets (loaded once at startup). */
 let vaultCache: Record<string, string> | null = null;
 let vaultEnabled = false;
+let vaultAuthMethod: 'token' | 'token-file' | undefined;
 
-/**
- * Initialise Vault integration. Called once during server startup.
- * Falls back to .env silently if Vault is not configured.
- */
+function isProductionDeployment(): boolean {
+  return process.env.NODE_ENV === 'production' && process.env.DEPLOYMENT_ENV === 'production';
+}
+
+function validateVaultAddress(rawAddress: string): string {
+  let url: URL;
+  try {
+    url = new URL(rawAddress);
+  } catch {
+    throw new Error('[Vault] VAULT_ADDR must be an absolute URL.');
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('[Vault] VAULT_ADDR must not contain credentials, a query, or a fragment.');
+  }
+  if (isProductionDeployment() && url.protocol !== 'https:') {
+    throw new Error('[Vault] Production VAULT_ADDR must use HTTPS.');
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('[Vault] VAULT_ADDR must use HTTP or HTTPS.');
+  }
+  return url.toString().replace(/\/$/, '');
+}
+
+function validateSecretPath(value: string): string {
+  const path = value.replace(/^\/+|\/+$/g, '');
+  if (!path || path.includes('..') || !/^[A-Za-z0-9_./-]+$/.test(path)) {
+    throw new Error('[Vault] VAULT_SECRET_PATH is invalid.');
+  }
+  return path;
+}
+
+async function loadVaultToken(): Promise<{ token?: string; method?: 'token' | 'token-file' }> {
+  const inlineToken = process.env.VAULT_TOKEN?.trim();
+  const tokenFile = process.env.VAULT_TOKEN_FILE?.trim();
+  if (inlineToken && tokenFile) {
+    throw new Error('[Vault] Configure VAULT_TOKEN or VAULT_TOKEN_FILE, not both.');
+  }
+  if (inlineToken) return { token: inlineToken, method: 'token' };
+  if (!tokenFile) return {};
+
+  const tokenBuffer = await readFile(tokenFile);
+  if (tokenBuffer.length === 0 || tokenBuffer.length > MAX_TOKEN_BYTES) {
+    throw new Error('[Vault] Workload token file is empty or too large.');
+  }
+  const token = tokenBuffer.toString('utf8').trim();
+  if (!token || /[\r\n]/.test(token)) {
+    throw new Error('[Vault] Workload token file has an invalid format.');
+  }
+  return { token, method: 'token-file' };
+}
+
+function requiredProductionSecrets(): string[] {
+  const additions = (process.env.VAULT_REQUIRED_SECRETS ?? '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => /^[A-Z][A-Z0-9_]+$/.test(value));
+  return [...new Set([...PRODUCTION_VAULT_SECRETS, ...additions])];
+}
+
+/** Load the KV secret document before validating or serving any traffic. */
 export async function initVault(): Promise<void> {
-  if (!VAULT_ADDR || !VAULT_TOKEN) {
-    console.log('[Vault] Vault not configured (VAULT_ADDR/VAULT_TOKEN absent). Using .env secrets.');
-    vaultEnabled = false;
+  vaultCache = null;
+  vaultEnabled = false;
+  vaultAuthMethod = undefined;
+
+  const rawAddress = process.env.VAULT_ADDR?.trim();
+  const required = process.env.VAULT_REQUIRED === 'true' || isProductionDeployment();
+  const credentials = await loadVaultToken();
+
+  if (!rawAddress && !credentials.token) {
+    if (required) throw new Error('[Vault] Vault is required for this deployment.');
+    console.log('[Vault] Vault not configured; using environment secrets for non-production use.');
     return;
   }
+  if (!rawAddress || !credentials.token || !credentials.method) {
+    throw new Error('[Vault] VAULT_ADDR and exactly one token source must be configured together.');
+  }
+
+  const address = validateVaultAddress(rawAddress);
+  const secretPath = validateSecretPath(process.env.VAULT_SECRET_PATH ?? DEFAULT_SECRET_PATH);
 
   try {
-    const url = `${VAULT_ADDR}/v1/${VAULT_SECRET_PATH}`;
-    const response = await fetch(url, {
-      headers: { 'X-Vault-Token': VAULT_TOKEN },
+    const response = await fetch(`${address}/v1/${secretPath}`, {
+      headers: { 'X-Vault-Token': credentials.token },
+      redirect: 'error',
+      signal: AbortSignal.timeout(5_000),
     });
+    if (!response.ok) throw new Error(`Vault returned HTTP ${response.status}`);
 
-    if (!response.ok) {
-      throw new Error(`Vault HTTP ${response.status}: ${await response.text()}`);
+    const responseText = await response.text();
+    if (Buffer.byteLength(responseText, 'utf8') > MAX_RESPONSE_BYTES) {
+      throw new Error('Vault response exceeded the size limit');
+    }
+    const body = JSON.parse(responseText) as { data?: { data?: unknown } | unknown };
+    const candidate = body?.data && typeof body.data === 'object' && 'data' in body.data
+      ? (body.data as { data?: unknown }).data
+      : body?.data;
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      throw new Error('Vault response did not contain a KV secret object');
     }
 
-    const body = await response.json() as any;
-    // Vault KV v2 nests data under data.data
-    vaultCache = body?.data?.data ?? body?.data ?? {};
-    vaultEnabled = true;
+    const loaded: Record<string, string> = {};
+    for (const [key, value] of Object.entries(candidate)) {
+      if (typeof value === 'string') loaded[key] = value;
+    }
+    if (isProductionDeployment()) {
+      const missing = requiredProductionSecrets().filter(key => !loaded[key]?.trim());
+      if (missing.length > 0) {
+        throw new Error(`Vault is missing ${missing.length} required production secret(s)`);
+      }
+    }
 
-    const keys = Object.keys(vaultCache!).join(', ');
-    console.log(`[Vault] ✅ Loaded ${Object.keys(vaultCache!).length} secrets from Vault: ${keys}`);
-  } catch (err: any) {
-    console.error(`[Vault] ❌ Failed to load secrets from Vault: ${err.message}`);
-    console.error('[Vault] Falling back to .env secrets. Fix Vault before production deploy!');
+    vaultCache = loaded;
+    vaultEnabled = true;
+    vaultAuthMethod = credentials.method;
+    console.log(`[Vault] Loaded ${Object.keys(loaded).length} secret values using ${credentials.method}.`);
+  } catch (error) {
+    vaultCache = null;
     vaultEnabled = false;
+    const message = error instanceof Error ? error.message : 'unknown Vault error';
+    if (process.env.NODE_ENV === 'production' || required) {
+      throw new Error(`[Vault] Startup aborted: ${message}`);
+    }
+    console.error(`[Vault] ${message}; falling back to environment secrets in non-production.`);
   }
 }
 
-/**
- * Get a secret by name.
- * Priority: Vault cache → process.env → undefined
- *
- * @param key - The secret name (e.g. 'JWT_SECRET', 'NULLIFIER_SECRET').
- * @returns   The secret value, or undefined if not found.
- */
 export function getSecret(key: string): string | undefined {
-  if (vaultEnabled && vaultCache && key in vaultCache) {
-    return vaultCache[key];
-  }
+  if (vaultEnabled && vaultCache && key in vaultCache) return vaultCache[key];
   return process.env[key];
 }
 
-/**
- * Get a required secret. Throws if not found in either Vault or .env.
- */
 export function requireSecret(key: string): string {
   const value = getSecret(key);
-  if (!value) {
-    const source = vaultEnabled ? 'Vault or environment' : 'environment';
-    throw new Error(`[Vault] Required secret '${key}' not found in ${source}`);
-  }
+  if (!value) throw new Error(`[Vault] Required secret '${key}' is unavailable.`);
   return value;
 }
 
-/**
- * Returns true if Vault is actively serving secrets.
- * Use this in health checks to expose Vault connectivity.
- */
 export function isVaultEnabled(): boolean {
   return vaultEnabled;
 }
 
-/**
- * Returns a summary for the /health endpoint.
- */
-export function getVaultStatus(): { enabled: boolean; address?: string; secretCount?: number } {
+export function isSecretFromVault(key: string): boolean {
+  return Boolean(vaultEnabled && vaultCache && key in vaultCache);
+}
+
+export function getVaultStatus(): {
+  enabled: boolean;
+  authMethod?: 'token' | 'token-file';
+  secretCount?: number;
+} {
   return {
     enabled: vaultEnabled,
-    address: vaultEnabled ? VAULT_ADDR : undefined,
+    authMethod: vaultEnabled ? vaultAuthMethod : undefined,
     secretCount: vaultEnabled ? Object.keys(vaultCache ?? {}).length : undefined,
   };
 }

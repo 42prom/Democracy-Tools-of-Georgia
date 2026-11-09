@@ -3,6 +3,8 @@ import { pool } from '../db/client';
 import redisClient from '../db/redis';
 import { HttpClientFactory } from '../utils/httpClient';
 import { getMetrics } from '../middleware/metrics';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { getSecret } from '../config/vault';
 
 const router = Router();
 
@@ -20,6 +22,22 @@ interface DependencyStatus {
   status: 'up' | 'down';
   latency_ms?: number;
   error?: string;
+}
+
+function safeDependencyError(error: unknown): string {
+  if (process.env.NODE_ENV === 'production') return 'dependency unavailable';
+  return error instanceof Error ? error.message : 'dependency unavailable';
+}
+
+function digest(value: string): Buffer {
+  return createHash('sha256').update(value, 'utf8').digest();
+}
+
+function isMetricsAuthorized(req: Request): boolean {
+  const expected = getSecret('METRICS_BEARER_TOKEN')?.trim();
+  const match = req.header('authorization')?.match(/^Bearer ([^\s]+)$/);
+  if (!expected || !match) return false;
+  return timingSafeEqual(digest(expected), digest(match[1]));
 }
 
 /**
@@ -78,10 +96,10 @@ async function checkPostgres(): Promise<DependencyStatus> {
       status: 'up',
       latency_ms: Date.now() - start,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       status: 'down',
-      error: error.message,
+      error: safeDependencyError(error),
     };
   }
 }
@@ -97,10 +115,10 @@ async function checkRedis(): Promise<DependencyStatus> {
       status: 'up',
       latency_ms: Date.now() - start,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       status: 'down',
-      error: error.message,
+      error: safeDependencyError(error),
     };
   }
 }
@@ -124,14 +142,14 @@ async function checkBiometricService(): Promise<DependencyStatus & { circuit_bre
       latency_ms: Date.now() - start,
       circuit_breaker: circuitState,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Check main client's circuit breaker state even on failure
     const mainClient = HttpClientFactory.getBiometricClient();
     const circuitState = mainClient.getCircuitState();
 
     return {
       status: 'down',
-      error: error.message,
+      error: safeDependencyError(error),
       circuit_breaker: circuitState,
     };
   }
@@ -142,13 +160,21 @@ async function checkBiometricService(): Promise<DependencyStatus & { circuit_bre
  * GET /metrics
  * Returns Prometheus formatted metrics
  */
-router.get('/metrics', async (_req: Request, res: Response) => {
+router.get('/metrics', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!getSecret('METRICS_BEARER_TOKEN')?.trim()) {
+    return res.status(503).json({ error: 'Metrics endpoint is not configured' });
+  }
+  if (!isMetricsAuthorized(req)) {
+    res.setHeader('WWW-Authenticate', 'Bearer');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
   try {
     const stats = await getMetrics();
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(stats);
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return res.send(stats);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve metrics' });
+    return res.status(500).json({ error: 'Failed to retrieve metrics' });
   }
 });
 

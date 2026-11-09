@@ -37,11 +37,14 @@ build/
 # Testing
 coverage/
 .nyc_output/
+security-artifacts/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+*.dump
+backups/
 
 # Docker
 docker-compose.override.yml
@@ -89,6 +92,9 @@ mobile/*_analyze*.txt
 mobile/*_analyze*.log
 mobile/analysis*.log
 mobile/android/app/google-services.json
+mobile/android/key.properties
+mobile/android/*.jks
+mobile/android/*.keystore
 mobile/ios/Runner/GoogleService-Info.plist
 
 # Admin build
@@ -123,3 +129,6 @@ backend/tsc_*.txt
 backend/tsc_*.log
 .coverage
 htmlcov/
+
+# Repository-local security tooling, evidence, and operational backups (never commit)
+.local/

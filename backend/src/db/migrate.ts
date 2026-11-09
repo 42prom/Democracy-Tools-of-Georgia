@@ -1,13 +1,77 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { query } from './client';
+import crypto from 'crypto';
+import { getClient, query } from './client';
 
-const MIGRATIONS_DIR = path.join(__dirname, '..', '..', 'db', 'migrations');
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR
+  ? path.resolve(process.env.MIGRATIONS_DIR)
+  : path.resolve(process.cwd(), 'db', 'migrations');
 
 interface Migration {
   version: number;
   filename: string;
   sql: string;
+  checksum: string;
+}
+
+interface AppliedMigration {
+  version: number;
+  filename: string;
+  checksum: string | null;
+}
+
+// Releases before the consolidated 0001 baseline tracked one file per change.
+// Those files were intentionally squashed, but deployed databases retain their
+// original immutable filenames. This explicit manifest prevents a missing-file
+// bypass while allowing the ledger to be normalized once with deterministic
+// synthetic checksums.
+const LEGACY_MIGRATION_FILENAMES: Readonly<Record<number, string>> = {
+  0: '000_enable_pgcrypto.sql',
+  1: '001_init.sql',
+  2: '002_add_poll_rewards.sql',
+  3: '003_create_regions.sql',
+  4: '004_identity_system.sql',
+  5: '005_settings_table.sql',
+  6: '006_survey_questions.sql',
+  7: '007_messages.sql',
+  8: '008_enrollment_verification.sql',
+  9: '009_user_rewards.sql',
+  10: '010_fix_users_schema.sql',
+  11: '011_make_pn_hash_nullable.sql',
+  12: '012_add_names_to_users.sql',
+  13: '013_add_pn_masked_to_users.sql',
+  14: '014_biometric_rate_limits.sql',
+  15: '015_add_published_at_to_messages.sql',
+  16: '016_add_notifications_enabled.sql',
+  17: '017_admin_auth.sql',
+  18: '018_device_voter_policy.sql',
+  19: '019_add_device_tokens.sql',
+  20: '020_unlinkable_ballots.sql',
+  21: '021_fix_regions_table.sql',
+  22: '022_add_participant_user_index.sql',
+  23: '023_add_nullifier_poll_index.sql',
+  24: '024_add_wallet_binding.sql',
+  25: '025_add_idempotency_keys.sql',
+  26: '026_add_liveness_nonce.sql',
+  27: '027_system_settings.sql',
+  28: '028_add_credential_dob.sql',
+  29: '029_make_device_key_nullable.sql',
+  30: '030_tickets_system.sql',
+  31: '031_wallet_transfers.sql',
+  32: '032_fix_idempotency_fk_cascade.sql',
+  33: '033_add_audit_export_events.sql',
+  38: '0038_analytics_performance.sql',
+  39: '0039_encrypted_votes.sql',
+  41: '041_geo_blocking.sql',
+  42: '042_remove_i18n_columns.sql',
+  43: '043_remove_remaining_i18n_columns.sql',
+};
+
+function legacyLedgerChecksum(version: number, filename: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`legacy-ledger:${version}:${filename}`, 'utf8')
+    .digest('hex');
 }
 
 /**
@@ -18,19 +82,21 @@ async function createMigrationsTable(): Promise<void> {
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
       filename VARCHAR(255) NOT NULL,
+      checksum CHAR(64),
       applied_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  await query(`ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum CHAR(64)`);
 }
 
 /**
  * Get list of applied migrations
  */
-async function getAppliedMigrations(): Promise<Set<number>> {
-  const result = await query<{ version: number }>(
-    'SELECT version FROM schema_migrations ORDER BY version'
+async function getAppliedMigrations(): Promise<Map<number, AppliedMigration>> {
+  const result = await query<AppliedMigration>(
+    'SELECT version, filename, checksum FROM schema_migrations ORDER BY version'
   );
-  return new Set(result.rows.map(row => row.version));
+  return new Map(result.rows.map(row => [row.version, row]));
 }
 
 /**
@@ -54,7 +120,8 @@ async function getAvailableMigrations(): Promise<Migration[]> {
     const filepath = path.join(MIGRATIONS_DIR, filename);
     const sql = await fs.readFile(filepath, 'utf-8');
 
-    migrations.push({ version, filename, sql });
+    const checksum = crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+    migrations.push({ version, filename, sql, checksum });
   }
 
   return migrations;
@@ -65,21 +132,31 @@ async function getAvailableMigrations(): Promise<Migration[]> {
  */
 async function applyMigration(migration: Migration): Promise<void> {
   console.log(`Applying migration ${migration.version}: ${migration.filename}`);
+  const client = await getClient();
 
   try {
-    // Execute migration SQL
-    await query(migration.sql);
+    await client.query('BEGIN');
 
-    // Record migration as applied
-    await query(
-      'INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)',
-      [migration.version, migration.filename]
+    // Historical files may contain an outer transaction for direct psql use.
+    // The runner owns it so schema changes and metadata commit atomically.
+    const executableSql = migration.sql
+      .replace(/^\s*BEGIN\s*;\s*/i, '')
+      .replace(/\s*COMMIT\s*;\s*$/i, '');
+    await client.query(executableSql);
+
+    await client.query(
+      'INSERT INTO schema_migrations (version, filename, checksum) VALUES ($1, $2, $3)',
+      [migration.version, migration.filename, migration.checksum]
     );
+    await client.query('COMMIT');
 
     console.log(`✓ Migration ${migration.version} applied successfully`);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(`✗ Migration ${migration.version} failed:`, error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -89,7 +166,7 @@ async function applyMigration(migration: Migration): Promise<void> {
  * already applied to prevent re-running them.
  */
 async function detectDockerInit(
-  appliedVersions: Set<number>,
+  appliedVersions: Map<number, AppliedMigration>,
   availableMigrations: Migration[]
 ): Promise<void> {
   if (appliedVersions.size > 0) return; // Already tracking
@@ -124,8 +201,8 @@ async function detectDockerInit(
   for (const migration of availableMigrations) {
     try {
       await query(
-        'INSERT INTO schema_migrations (version, filename) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [migration.version, migration.filename]
+        'INSERT INTO schema_migrations (version, filename, checksum) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [migration.version, migration.filename, migration.checksum]
       );
     } catch {
       // Ignore errors — best effort
@@ -133,6 +210,46 @@ async function detectDockerInit(
   }
 
   console.log('✓ Existing migrations recorded in schema_migrations');
+}
+
+async function validateAndBackfillMigrationMetadata(
+  applied: Map<number, AppliedMigration>,
+  available: Migration[]
+): Promise<void> {
+  const availableByVersion = new Map(available.map(migration => [migration.version, migration]));
+  for (const row of applied.values()) {
+    const legacyFilename = LEGACY_MIGRATION_FILENAMES[row.version];
+    if (legacyFilename === row.filename) {
+      const expected = legacyLedgerChecksum(row.version, row.filename);
+      if (!row.checksum) {
+        await query('UPDATE schema_migrations SET checksum = $2 WHERE version = $1 AND checksum IS NULL', [
+          row.version,
+          expected,
+        ]);
+      } else if (row.checksum !== expected) {
+        throw new Error(`Legacy migration ${row.version} ledger checksum mismatch`);
+      }
+      continue;
+    }
+
+    const migration = availableByVersion.get(row.version);
+    if (!migration) {
+      throw new Error(`Applied migration ${row.version} (${row.filename}) is missing from disk`);
+    }
+    if (migration.filename !== row.filename) {
+      throw new Error(
+        `Migration ${row.version} filename drift: database=${row.filename}, disk=${migration.filename}`
+      );
+    }
+    if (!row.checksum) {
+      await query('UPDATE schema_migrations SET checksum = $2 WHERE version = $1 AND checksum IS NULL', [
+        row.version,
+        migration.checksum,
+      ]);
+    } else if (row.checksum !== migration.checksum) {
+      throw new Error(`Migration ${row.version} checksum mismatch; applied migrations are immutable`);
+    }
+  }
 }
 
 /**
@@ -154,6 +271,7 @@ export async function runMigrations(): Promise<void> {
 
     // Re-read applied versions after potential Docker init detection
     const updatedAppliedVersions = await getAppliedMigrations();
+    await validateAndBackfillMigrationMetadata(updatedAppliedVersions, availableMigrations);
 
     // Filter pending migrations
     const pendingMigrations = availableMigrations.filter(
@@ -195,6 +313,7 @@ export async function checkStatus(): Promise<void> {
     // Check for Docker init simulation
     await detectDockerInit(appliedVersions, availableMigrations);
     const updatedAppliedVersions = await getAppliedMigrations();
+    await validateAndBackfillMigrationMetadata(updatedAppliedVersions, availableMigrations);
 
     console.log(`\n[Migration Status]`);
     console.log(`Applied: ${updatedAppliedVersions.size}`);
