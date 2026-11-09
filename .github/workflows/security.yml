@@ -162,6 +162,12 @@ jobs:
             sleep 1
           done
           docker exec "$container" wget -q --spider http://127.0.0.1:8080/
+          # Cacheability scanner 10049 reports correct no-store responses too.
+          # Enforce the security property against the running server explicitly.
+          for path in / /index.html /login; do
+            headers="$(docker exec "$container" wget -S --spider "http://127.0.0.1:8080${path}" 2>&1)"
+            echo "$headers" | grep -Eiq 'Cache-Control:[[:space:]]*no-store'
+          done
           docker run --rm --network "$network" \
             -v "$PWD/security-artifacts:/zap/wrk:rw" "$ZAP_IMAGE" \
             zap-baseline.py -t "http://${container}:8080" \
