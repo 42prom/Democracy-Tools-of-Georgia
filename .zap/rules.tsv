@@ -7,3 +7,5 @@
 10038	FAIL	Missing or unsafe Content-Security-Policy
 10049	FAIL	Authentication credentials stored by a shared cache
 10055	FAIL	CSP contains a wildcard directive
+# SPA detection describes this dashboard's architecture; it is not a vulnerability.
+10109	INFO	Modern Web Application detection retained in the report
