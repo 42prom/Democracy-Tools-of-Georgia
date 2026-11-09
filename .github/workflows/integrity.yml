@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
   schedule:
     # Daily integrity sweep at 02:00 UTC
     - cron: "0 2 * * *"
