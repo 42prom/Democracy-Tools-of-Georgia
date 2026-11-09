@@ -177,7 +177,17 @@ jobs:
         run: flutter pub get
       - name: Build unsigned iOS Simulator app
         working-directory: ./mobile
-        run: flutter build ios --simulator --no-codesign
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build ios --simulator --no-codesign --verbose 2>&1 | tee "$RUNNER_TEMP/ios-build.log"
+      - name: Preserve iOS build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ios-build-diagnostics
+          path: ${{ runner.temp }}/ios-build.log
+          retention-days: 7
       - name: Run the shared integration contract on iOS
         working-directory: ./mobile
         shell: bash
