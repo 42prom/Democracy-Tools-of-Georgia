@@ -102,7 +102,7 @@ export async function encryptOptionId(
 
   const key = Buffer.from(keyHex.rows[0].sealed_key_hex, 'hex');
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv(ALGO, key, iv);
+  const cipher = createCipheriv(ALGO, key, iv, { authTagLength: 16 });
 
   const encrypted = Buffer.concat([
     cipher.update(optionId, 'utf8'),
@@ -134,7 +134,8 @@ export async function decryptOptionId(
   const decipher = createDecipheriv(
     ALGO,
     key,
-    Buffer.from(choice.iv, 'hex')
+    Buffer.from(choice.iv, 'hex'),
+    { authTagLength: 16 }
   );
   decipher.setAuthTag(Buffer.from(choice.authTag, 'hex'));
 

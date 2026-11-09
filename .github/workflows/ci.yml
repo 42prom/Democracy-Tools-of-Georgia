@@ -138,6 +138,12 @@ jobs:
       - name: Install Flutter dependencies
         working-directory: ./mobile
         run: flutter pub get
+      - name: Enable KVM for the CI runner
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Run Android host and platform-channel tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -145,7 +151,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          port: 5588
+          emulator-port: 5588
           disk-size: 4096M
           disable-animations: true
           script: cd mobile && flutter test integration_test/app_smoke_test.dart -d emulator-5588 --reporter expanded

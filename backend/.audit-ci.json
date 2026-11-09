@@ -1,8 +1,3 @@
 {
-  "high": true,
-  "allowlist": [
-    "GHSA-87r5-mp6g-v5jJ",
-    "jsonpath",
-    "bfj"
-  ]
+  "high": true
 }

@@ -7,4 +7,4 @@ opencv-python-headless==5.0.0.93
 numpy==2.4.6
 pydantic==2.13.5
 requests==2.34.2
-Pillow==12.3.0
+Pillow==13.0.0

@@ -1,0 +1,9 @@
+# Exact, reviewed historical findings; do not exempt entire tests or source files.
+# Synthetic MFA provisioning fixture; never used by a deployed account.
+04e1d4c4c1d8679c666e655861648ca76ce556b8:admin/src/tests/AdminUsers.test.tsx:generic-api-key:37
+# The same synthetic value embedded in a test otpauth URI.
+04e1d4c4c1d8679c666e655861648ca76ce556b8:admin/src/tests/AdminUsers.test.tsx:generic-api-key:38
+# Apple's publicly published App Attestation root certificate, not a private key.
+04e1d4c4c1d8679c666e655861648ca76ce556b8:backend/src/services/appleAppAttest.ts:generic-api-key:1
+# RFC 6238 TOTP test vector, not a provisioned administrator secret.
+04e1d4c4c1d8679c666e655861648ca76ce556b8:backend/tests/admin-security-primitives.test.ts:generic-api-key:9

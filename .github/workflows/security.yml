@@ -37,7 +37,8 @@ jobs:
           docker run --rm
           -v "$PWD:/repo"
           "$GITLEAKS_IMAGE"
-          detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose
+          detect --source=/repo --config=/repo/.gitleaks.toml
+          --gitleaks-ignore-path=/repo/.gitleaksignore --redact --verbose
 
   sast-and-filesystem:
     name: SAST, vulnerabilities, secrets, and misconfiguration
@@ -144,10 +145,17 @@ jobs:
           }
           trap cleanup EXIT
           mkdir -p security-artifacts
+          # ZAP runs as uid 1000; give it ownership of only its report directory.
+          sudo chown 1000:1000 security-artifacts
           cp .zap/rules.tsv security-artifacts/rules.tsv
           docker build --pull=false -t "dtg-admin-dast:${GITHUB_SHA}" admin
           docker network create "$network"
           docker run -d --name "$container" --network "$network" "dtg-admin-dast:${GITHUB_SHA}"
+          for attempt in $(seq 1 30); do
+            if docker exec "$container" wget -q --spider http://127.0.0.1:8080/; then break; fi
+            sleep 1
+          done
+          docker exec "$container" wget -q --spider http://127.0.0.1:8080/
           docker run --rm --network "$network" \
             -v "$PWD/security-artifacts:/zap/wrk:rw" "$ZAP_IMAGE" \
             zap-baseline.py -t "http://${container}:8080" \

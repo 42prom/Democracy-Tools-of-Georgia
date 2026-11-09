@@ -38,6 +38,12 @@ describe('authenticated secret encryption', () => {
     const ciphertext = cipher.update('legacy-secret', 'utf8', 'hex') + cipher.final('hex');
     expect(decryptSensitiveValue(`${iv.toString('hex')}:${ciphertext}`)).toBe('legacy-secret');
   });
+
+  it('rejects truncated GCM authentication tags', () => {
+    const parts = encryptSensitiveValue('sensitive-admin-value').split(':');
+    parts[2] = parts[2].slice(0, 24);
+    expect(() => decryptSensitiveValue(parts.join(':'))).toThrow();
+  });
 });
 
 describe('admin password policy', () => {
