@@ -55,6 +55,12 @@ jobs:
           semgrep scan --error --metrics=off
           --exclude=.local --exclude=build --exclude=dist --exclude=node_modules
           --config=p/security-audit --config=p/owasp-top-ten .
+  filesystem:
+    name: Trivy repository dependencies and configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Trivy repository gate
         run: >-
           docker run --rm
@@ -145,9 +151,9 @@ jobs:
           }
           trap cleanup EXIT
           mkdir -p security-artifacts
+          cp .zap/rules.tsv security-artifacts/rules.tsv
           # ZAP runs as uid 1000; give it ownership of only its report directory.
           sudo chown 1000:1000 security-artifacts
-          cp .zap/rules.tsv security-artifacts/rules.tsv
           docker build --pull=false -t "dtg-admin-dast:${GITHUB_SHA}" admin
           docker network create "$network"
           docker run -d --name "$container" --network "$network" "dtg-admin-dast:${GITHUB_SHA}"

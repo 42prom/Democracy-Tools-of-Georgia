@@ -54,10 +54,9 @@ describe('survey voting concurrency (real PostgreSQL)', () => {
   });
 
   afterAll(async () => {
-    await query('DELETE FROM survey_responses WHERE poll_id = $1', [pollId]);
-    // audit_log is intentionally append-only; test events remain as immutable evidence.
-    await query('DELETE FROM polls WHERE id = $1', [pollId]);
-    await query('DELETE FROM users WHERE id = $1', [userId]);
+    // Keep committed fixtures and append-only evidence intact. The CI runner
+    // disposes of this dedicated test database; production lifecycle guards
+    // must not be disabled or bypassed merely to clean up a test fixture.
     await close();
   });
 
@@ -118,5 +117,12 @@ describe('survey voting concurrency (real PostgreSQL)', () => {
       participants: '1',
       rewards: '0',
     });
+  });
+
+  it('preserves an active poll against deletion after a committed submission', async () => {
+    await expect(query('DELETE FROM polls WHERE id = $1', [pollId]))
+      .rejects.toThrow('only draft polls may be deleted');
+    const result = await query('SELECT id FROM polls WHERE id = $1', [pollId]);
+    expect(result.rows).toHaveLength(1);
   });
 });

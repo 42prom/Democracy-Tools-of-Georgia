@@ -121,7 +121,6 @@ jobs:
     name: Merkle Vote Integrity Sweep
     runs-on: ubuntu-latest
     needs: [crypto-tests]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     services:
       postgres:
         image: postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
@@ -132,7 +131,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U dtg_user -d dtg_ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
