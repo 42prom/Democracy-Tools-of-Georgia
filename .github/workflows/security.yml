@@ -84,7 +84,7 @@ jobs:
           docker run --rm -v "$PWD:/src" "$SYFT_IMAGE" \
             dir:/src -o cyclonedx-json=/src/security-artifacts/repository.cdx.json
       - name: Upload SBOM
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: repository-cyclonedx-sbom
           path: security-artifacts/repository.cdx.json
@@ -126,7 +126,7 @@ jobs:
             "dtg-${{ matrix.name }}-security:${{ github.sha }}" \
             -o "cyclonedx-json=/out/${{ matrix.name }}.cdx.json"
       - name: Upload image SBOM
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.name }}-image-cyclonedx-sbom
           path: security-artifacts/${{ matrix.name }}.cdx.json
@@ -174,7 +174,7 @@ jobs:
             -c /zap/wrk/rules.tsv -r admin-zap.html -J admin-zap.json
       - name: Upload DAST evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: admin-zap-baseline
           path: |
