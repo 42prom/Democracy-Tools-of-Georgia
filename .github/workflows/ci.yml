@@ -154,10 +154,10 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          emulator-port: 5588
+          emulator-port: 5582
           disk-size: 4096M
           disable-animations: true
-          script: cd mobile && flutter test integration_test/app_smoke_test.dart -d emulator-5588 --reporter expanded
+          script: cd mobile && flutter test integration_test/app_smoke_test.dart -d emulator-5582 --reporter expanded
 
   mobile-ios-simulator:
     name: iOS Simulator Build & Integration

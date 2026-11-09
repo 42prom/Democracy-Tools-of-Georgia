@@ -156,7 +156,7 @@ export default function SettingsNotifications() {
                         rows={4}
                         value={config.serviceAccountJson}
                         onChange={(e) => setConfig({ ...config, serviceAccountJson: e.target.value })}
-                        placeholder='{"type": "service_account", ...}'
+                          placeholder="Paste the Firebase service account JSON"
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm font-mono"
                     />
                     <div className="mt-1 text-xs text-gray-500 flex items-center">
